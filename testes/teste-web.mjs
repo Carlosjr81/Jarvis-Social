@@ -57,6 +57,8 @@ if (pw) {
     const nav = await pw.chromium.launch();
     try {
       const ctx = await nav.newContext({ viewport: { width: 360, height: 740 }, locale: "pt-BR", timezoneId: "Asia/Tokyo" });
+      // A abertura aparece uma vez por sessão; o fluxo principal começa sem ela (ela tem teste próprio).
+      await ctx.addInitScript(() => { try { sessionStorage.setItem("jarvis-social:abertura", "1"); } catch {} });
       const pg = await ctx.newPage();
       const erros = []; pg.on("pageerror", (e) => erros.push(e.message));
       fs.mkdirSync(path.join(RAIZ, "testes/saida"), { recursive: true });
@@ -140,6 +142,25 @@ if (pw) {
       await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
       await pg.screenshot({ path: path.join(RAIZ, "testes/saida/inicio-360.png"), fullPage: true });
       igual(erros, [], "erros de JavaScript na página");
+    } finally { await nav.close(); srv.close(); }
+  });
+  teste("abertura: vídeo mudo com Pular; uma vez por sessão; some sozinha se o vídeo falhar", async () => {
+    const srv = await servir(); const porta = srv.address().port;
+    const nav = await pw.chromium.launch();
+    try {
+      const pg = await (await nav.newContext({ viewport: { width: 360, height: 740 } })).newPage();
+      await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
+      await pg.locator("#abertura video[muted], #abertura video").first().waitFor();
+      igual(await pg.evaluate(() => document.querySelector("#abertura video").muted), true, "mudo");
+      await pg.getByRole("button", { name: "Pular ›" }).click();
+      await pg.getByText("Novo Reel").first().waitFor();
+      await pg.reload(); await pg.getByText("Novo Reel").first().waitFor();
+      igual(await pg.locator("#abertura").count(), 0, "não repete na mesma sessão");
+      // vídeo ausente (ou formato sem suporte): a abertura não pode trancar a entrada
+      const pg2 = await (await nav.newContext({ viewport: { width: 360, height: 740 } })).newPage();
+      await pg2.route("**/abertura-v1.mp4", (r) => r.fulfill({ status: 404, body: "" }));
+      await pg2.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
+      await pg2.getByText("Novo Reel").first().waitFor({ timeout: 8000 });
     } finally { await nav.close(); srv.close(); }
   });
 } else if (process.env.JS_EXIGIR_TUDO) teste("Playwright presente (exigido no Actions)", () => { throw new Error("Playwright ausente"); });

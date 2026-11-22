@@ -109,6 +109,10 @@ dl.recibo { display: grid; grid-template-columns: max-content 1fr; gap: 4px 10px
 /* o carimbo de missão cumprida (publicado de verdade ou no fim do teste) */
 .carimbo { display: block; width: max-content; max-width: 100%; margin: 12px auto; padding: 6px 18px; font-family: var(--letreiro); font-size: 24px; color: var(--sol-1); border: 3px solid var(--sol-1); border-radius: 10px; transform: rotate(-4deg); text-shadow: 2px 2px 0 #000; box-shadow: 0 0 24px #FFD23F44; animation: carimbo .45s cubic-bezier(.2,1.6,.4,1) both; }
 @keyframes carimbo { from { transform: rotate(-4deg) scale(2.4); opacity: 0; } }
+/* a abertura (vídeo mudo, uma vez por sessão, com Pular) */
+#abertura { position: fixed; inset: 0; z-index: 50; background: #0A0612; display: flex; align-items: center; justify-content: center; }
+#abertura video { width: 100%; height: 100%; object-fit: contain; }
+#abertura button { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 14px; min-height: 44px; background: #0A0612aa; border-color: #ffffff55; }
 .oculto { display: none !important; }
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
 </style>

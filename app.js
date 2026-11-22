@@ -14,7 +14,7 @@ import { formatarLocal, partesLocais, somarDias, NOMES_DIA_LONGO, FUSO_PADRAO } 
 import { AJUDA } from "./supabase/functions/_compartilhado/comandos.js";
 import { sugerirEmail, PRAZOS_ACESSO, NOMES_SITUACAO } from "./supabase/functions/_compartilhado/acesso.js";
 
-export const VERSAO_PAINEL = "2026-11-22e";
+export const VERSAO_PAINEL = "2026-11-22f";
 const CH = { sessao: "jarvis-social:sessao", demo: "jarvis-social:demo", modo: "jarvis-social:modo", rascunho: "jarvis-social:rascunho", email: "jarvis-social:email" };
 const ls = {
   ler(k, padrao = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch { return padrao; } },
@@ -936,6 +936,29 @@ async function iniciar() {
   await mostrar();
 }
 
+// ------------------------------------------------------------------ abertura
+// O personagem correndo pelo dia e trocando de roupa, até o logo. Vídeo mudo
+// (toca sozinho no celular), uma vez por sessão, com Pular. Termina em
+// qualquer erro, em 12 s ou se não começar em 4 s. Movimento reduzido: não toca.
+const VIDEO_ABERTURA = "abertura-v1.mp4";
+function abertura() {
+  return new Promise((pronto) => {
+    let ja = false; try { ja = sessionStorage.getItem("jarvis-social:abertura") === "1"; } catch {}
+    if (ja || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)) return pronto();
+    try { sessionStorage.setItem("jarvis-social:abertura", "1"); } catch {}
+    const el = document.createElement("div"); el.id = "abertura"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Abertura do Jarvis Social");
+    el.innerHTML = `<video muted playsinline autoplay preload="auto" poster="abertura-v1-poster.jpg" src="${VIDEO_ABERTURA}"></video><button type="button">Pular ›</button>`;
+    document.body.appendChild(el);
+    const v = el.querySelector("video"); let fim = false;
+    const fechar = () => { if (fim) return; fim = true; el.remove(); pronto(); };
+    el.querySelector("button").onclick = fechar; el.querySelector("button").focus();
+    v.onended = fechar; v.onerror = fechar;
+    setTimeout(() => { if (v.currentTime === 0) fechar(); }, 4000);
+    setTimeout(fechar, 12000);
+    v.play && v.play().catch(fechar);
+  });
+}
+
 window.addEventListener("hashchange", mostrar);
 // Voltou do segundo plano: relê o estado do servidor antes de qualquer reenvio.
 document.addEventListener("visibilitychange", async () => {
@@ -949,4 +972,4 @@ document.addEventListener("visibilitychange", async () => {
   } catch {}
 });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
-iniciar();
+abertura().then(iniciar);

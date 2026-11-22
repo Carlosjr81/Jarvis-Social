@@ -36,6 +36,16 @@ personagem de jogo ou rede. Fontes livres em `fontes/` (Inter e Rammetto One,
 SIL OFL). Tokens no `:root` do `index.html`; contraste medido (texto ≥ 4,5:1,
 branco sobre o degradê ≥ 4,7:1): mudou uma cor, meça de novo.
 
+## Abertura e logo (22/11/2026)
+- `abertura-v1.mp4` (720×1280, 9,3 s, **sem áudio**, ~0,9 MB) + poster: o
+  personagem do dono em desenho animado correndo pelo dia (pijama, social,
+  casual, largado, academia, pijama de dinossauro) até o logo. Gerado pelo
+  motor do Jarvis-Claude (`ferramentas/propaganda/`, `--modo abertura`).
+  Uma vez por sessão, botão Pular, some em erro/12 s, movimento reduzido não
+  toca. Vinheta nova entra com outro nome (v2) e no `sw.js`.
+- Logo: `icone.svg` (sol listrado + play com glitch, moldura no degradê),
+  `logo.svg` (horizontal) e `logo-vertical.svg`, com a fonte embutida.
+
 ## Regras que não podem quebrar
 - Demonstração, "agendamento confirmado no Jarvis" e "publicação concluída"
   são três coisas diferentes (campo `recibo.confirmacao`). Publicado só com
