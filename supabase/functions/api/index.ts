@@ -31,6 +31,14 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: c });
   const url = new URL(req.url);
   const caminho = url.pathname.replace(/^.*?\/api(?=\/|$)/, "") || "/";
+  // Destino do link de confirmação do e-mail. Fica FORA de carlosjr81.github.io
+  // porque lá o link era capturado por outro app instalado (Treino Livre).
+  if (caminho === "/confirmado") {
+    const erro = url.searchParams.get("error_description") || "";
+    const txt = erro ? `Jarvis Social\n\nNão deu para confirmar: ${erro}\n\nAbra o painel e toque em Entrar; se pedir, reenvie a confirmação.\nhttps://carlosjr81.github.io/Jarvis-Social/`
+      : "Jarvis Social\n\nE-mail confirmado ✓\n\nVolte ao painel do Jarvis Social e toque em Entrar com o seu e-mail e senha.\nhttps://carlosjr81.github.io/Jarvis-Social/";
+    return new Response(txt, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+  }
   let corpo = {};
   if (!["GET", "HEAD"].includes(req.method)) {
     const txt = await req.text();

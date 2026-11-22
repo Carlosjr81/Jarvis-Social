@@ -14,7 +14,7 @@ import { formatarLocal, partesLocais, somarDias, NOMES_DIA_LONGO, FUSO_PADRAO } 
 import { AJUDA } from "./supabase/functions/_compartilhado/comandos.js";
 import { sugerirEmail, PRAZOS_ACESSO, NOMES_SITUACAO } from "./supabase/functions/_compartilhado/acesso.js";
 
-export const VERSAO_PAINEL = "2026-11-22m";
+export const VERSAO_PAINEL = "2026-11-22n";
 const CH = { sessao: "jarvis-social:sessao", demo: "jarvis-social:demo", modo: "jarvis-social:modo", rascunho: "jarvis-social:rascunho", email: "jarvis-social:email" };
 const ls = {
   ler(k, padrao = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch { return padrao; } },
@@ -81,12 +81,11 @@ function clienteServidor() {
     modo: "servidor",
     usuario: () => sessao && { email: sessao.email },
     async entrar(email, senha) { guardar(await auth("token?grant_type=password", { email, password: senha })); },
-    async cadastrar(email, senha, nome) { const j = await auth("signup", { email, password: senha, data: { nome } }); if (j.access_token) guardar(j); return j; },
+    async cadastrar(email, senha, nome) { const j = await auth("signup?redirect_to=" + encodeURIComponent(base + "/functions/v1/api/confirmado"), { email, password: senha, data: { nome } }); if (j.access_token) guardar(j); return j; },
     async esqueci(email) { await auth("recover", { email }); },
-    // Confirmação por CÓDIGO (não por link): o link do e-mail abria outro app
-    // instalado no mesmo endereço (carlosjr81.github.io). O código é digitado aqui.
-    async confirmarCodigo(email, codigo) { guardar(await auth("verify", { type: "signup", email, token: codigo })); },
-    async reenviarCodigo(email) { await auth("resend", { type: "signup", email }); },
+    // O link do e-mail leva a uma página do servidor (fora de carlosjr81.github.io,
+    // onde outro app instalado capturava o link). Depois é só tocar em Entrar.
+    async reenviarCodigo(email) { await auth("resend?redirect_to=" + encodeURIComponent(base + "/functions/v1/api/confirmado"), { type: "signup", email }); },
     async chamar(metodo, caminho, corpo, consulta) {
       const t = await token();
       const q = consulta ? "?" + new URLSearchParams(Object.entries(consulta).filter(([, v]) => v != null)).toString() : "";
@@ -288,21 +287,13 @@ telas.entrar = async (el, modoTela = ls.ler(CH.email) ? "entrar" : "criar") => {
     }
   };
   $("#b-demo").onclick = () => { ls.gravar(CH.modo, "demonstracao"); location.reload(); };
-  // Código do e-mail: digita aqui mesmo. Se o link do e-mail já confirmou, "Entrar" resolve.
+  // Confirmação: toca no link do e-mail (abre uma página do servidor), volta e toca em Entrar.
   function pedirCodigo(email, senha, jaTinha = false) {
-    $("#msg").innerHTML = `<div class="faixa ok">${jaTinha ? "Falta confirmar o e-mail." : "Conta criada!"} Digite o código que chegou em <strong>${esc(email)}</strong> (veja também o spam).</div>
-      <label for="codigo">Código do e-mail</label><input id="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="10" style="font-size:1.4em;letter-spacing:.2em">
-      <button type="button" class="primario grande" id="b-codigo" style="margin-top:8px;width:100%">Confirmar</button>
-      <div class="linha" style="margin-top:8px"><button type="button" id="b-reenviar">Reenviar código</button><button type="button" id="b-ja">Já confirmei pelo link › Entrar</button></div><div id="msg-codigo"></div>`;
-    $("#codigo").focus();
-    $("#b-codigo").onclick = async () => {
-      const c = $("#codigo").value.replace(/\D/g, "");
-      if (c.length < 6) return msgEm("#msg-codigo", "O código tem 6 números ou mais.");
-      try { await cli.confirmarCodigo(email, c); await iniciar(); }
-      catch (err) { msgEm("#msg-codigo", /expired|invalid/i.test(err.message) ? "Código vencido ou errado. Toque em Reenviar código." : err.message); }
-    };
-    $("#b-reenviar").onclick = async () => { try { await cli.reenviarCodigo(email); msgEm("#msg-codigo", "Código novo enviado.", "ok"); } catch (err) { msgEm("#msg-codigo", /seconds|rate/i.test(err.message) ? "Espere 1 minuto e tente de novo." : err.message); } };
-    $("#b-ja").onclick = async () => { try { await cli.entrar(email, senha); await iniciar(); } catch (err) { msgEm("#msg-codigo", /confirm/i.test(err.message) ? "Ainda não confirmado: use o código." : err.message); } };
+    $("#msg").innerHTML = `<div class="faixa ok">${jaTinha ? "Falta confirmar o e-mail." : "Conta criada!"} Abra o e-mail enviado para <strong>${esc(email)}</strong> (veja também o spam), toque em <strong>Confirm email address</strong> e volte aqui.</div>
+      <button type="button" class="primario grande" id="b-ja" style="margin-top:8px;width:100%">Já confirmei › Entrar</button>
+      <button type="button" id="b-reenviar" style="margin-top:8px;width:100%">Reenviar o e-mail</button><div id="msg-codigo"></div>`;
+    $("#b-reenviar").onclick = async () => { try { await cli.reenviarCodigo(email); msgEm("#msg-codigo", "E-mail reenviado.", "ok"); } catch (err) { msgEm("#msg-codigo", /seconds|rate/i.test(err.message) ? "Espere 1 minuto e tente de novo." : err.message); } };
+    $("#b-ja").onclick = async () => { try { await cli.entrar(email, senha); await iniciar(); } catch (err) { msgEm("#msg-codigo", /confirm/i.test(err.message) ? "Ainda não confirmado: toque no link do e-mail primeiro." : err.message); } };
   }
 };
 
