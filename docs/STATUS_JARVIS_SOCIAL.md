@@ -11,7 +11,7 @@
 | Actions | workflow *Jarvis Social* dispara sozinho a cada push (repositório público). Run 45030840705 (22/11/2026): verde, mas SQL e painel não tinham rodado no runner; corrigido para instalar PostgreSQL e Chromium e reprovar se faltarem |
 | Etapa | A concluída (fundação) + B em parte (agendamento e adaptador Meta escritos e testados com simulador) |
 | Testes | `node testes/rodar.mjs` → 74 passou / 0 falhou (22/11/2026, sessão na nuvem e Actions) |
-| Painel publicado | **Ainda não.** Depois de ligar o Pages: https://carlosjr81.github.io/Jarvis-Social/ (abre em DEMONSTRAÇÃO até o servidor existir) |
+| Painel publicado | Pages ligado pelo dono em 22/11/2026 (main, raiz): https://carlosjr81.github.io/Jarvis-Social/ — em DEMONSTRAÇÃO até o servidor existir. A sessão na nuvem não alcança github.io; abertura no celular a confirmar pelo dono |
 | Servidor (Supabase) | **Não criado.** Depende do passo 1 do dono em `docs/DEPLOY.md` |
 | Instagram real | **Não conectado / nenhuma publicação real feita.** Depende do app da Meta (passo 2 do `DEPLOY.md`) |
 
@@ -33,7 +33,7 @@
 ## Bloqueios (só o dono resolve)
 1. Criar o projeto grátis no Supabase e 3 segredos no GitHub (`docs/DEPLOY.md`, passo 1).
 2. Criar o app da Meta e 2 segredos (`docs/DEPLOY.md`, passo 2).
-3. Ligar o GitHub Pages do repositório (`docs/DEPLOY.md`, passo 0).
+3. ~~Ligar o GitHub Pages~~ feito em 22/11/2026.
 
 ## Próxima ação
 - Com o Pages ligado e os segredos do passo 1: disparar o workflow

@@ -20,6 +20,7 @@ teste("manifest e ícone existem; SW com escopo da pasta", () => {
   igual([m.scope, m.display, m.lang], ["./", "standalone", "pt-BR"]); verdade(fs.existsSync(path.join(RAIZ, "icone.svg")));
   verdade(fs.readFileSync(path.join(RAIZ, "app.js"), "utf8").includes(`register("./sw.js", { scope: "./" })`));
 });
+teste(".nojekyll presente (o Pages ignoraria _compartilhado/ sem ele)", () => verdade(fs.existsSync(path.join(RAIZ, ".nojekyll"))));
 teste("todo arquivo da casca do SW existe", () => {
   const sw = fs.readFileSync(path.join(RAIZ, "sw.js"), "utf8");
   const lista = [...sw.matchAll(/"\.\/([^"]*)"/g)].map((m) => m[1]).filter(Boolean);
