@@ -158,7 +158,7 @@ if (pw) {
       igual(await pg.locator("#abertura").count(), 0, "não repete na mesma sessão");
       // vídeo ausente (ou formato sem suporte): a abertura não pode trancar a entrada
       const pg2 = await (await nav.newContext({ viewport: { width: 360, height: 740 } })).newPage();
-      await pg2.route("**/abertura-v1.mp4", (r) => r.fulfill({ status: 404, body: "" }));
+      await pg2.route("**/abertura-v2.mp4", (r) => r.fulfill({ status: 404, body: "" }));
       await pg2.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
       await pg2.getByText("Novo Reel").first().waitFor({ timeout: 8000 });
     } finally { await nav.close(); srv.close(); }

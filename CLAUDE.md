@@ -37,7 +37,7 @@ SIL OFL). Tokens no `:root` do `index.html`; contraste medido (texto ≥ 4,5:1,
 branco sobre o degradê ≥ 4,7:1): mudou uma cor, meça de novo.
 
 ## Abertura e logo (22/11/2026)
-- `abertura-v1.mp4` (720×1280, 9,3 s, **sem áudio**, ~0,9 MB) + poster: o
+- `abertura-v2.mp4` (720×1280, 9,3 s, **sem áudio**, ~0,9 MB) + poster: o
   personagem do dono em desenho animado correndo pelo dia (pijama, social,
   casual, largado, academia, pijama de dinossauro) até o logo. Gerado pelo
   motor do Jarvis-Claude (`ferramentas/propaganda/`, `--modo abertura`).
