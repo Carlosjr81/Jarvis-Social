@@ -945,8 +945,8 @@ const LIGAR_SERVIDOR = `<small class="fraco">3 toques, uma vez só. Depois tudo 
     <a class="botao" href="https://supabase.com/dashboard/account/tokens" target="_blank" rel="noopener">1. Gerar token no Supabase</a>
     <button data-copiar="JS_SUPABASE_ACCESS_TOKEN">2. Copiar o nome do segredo</button>
     <a class="botao" href="${REPO_GH}/settings/secrets/actions/new" target="_blank" rel="noopener">3. Colar no GitHub</a>
-    <a class="botao" href="${REPO_GH}/actions/workflows/jarvis-social.yml" target="_blank" rel="noopener">Ver a instalação</a>
-  </span><small class="fraco">No passo 3: Name = o que você copiou no 2; Secret = o token do 1. O token nunca passa pelo chat.</small>`;
+    <a class="botao" href="${REPO_GH}/actions/workflows/jarvis-social.yml" target="_blank" rel="noopener">4. Instalar agora (Run workflow)</a>
+  </span><small class="fraco">No passo 3: Name = o que você copiou no 2; Secret = o token do 1. No 4: "Run workflow" › Run (ou espere: o relógio tenta sozinho). O token nunca passa pelo chat.</small>`;
 document.addEventListener("click", (e) => { if (e.target.closest("#ir-servidor-cfg")) { ls.apagar(CH.modo); location.reload(); } });
 
 // Lista de configuração (dono/admin): o que falta para tudo funcionar sozinho.
