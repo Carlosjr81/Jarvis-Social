@@ -14,7 +14,7 @@ import { formatarLocal, partesLocais, somarDias, NOMES_DIA_LONGO, FUSO_PADRAO } 
 import { AJUDA } from "./supabase/functions/_compartilhado/comandos.js";
 import { sugerirEmail, PRAZOS_ACESSO, NOMES_SITUACAO } from "./supabase/functions/_compartilhado/acesso.js";
 
-export const VERSAO_PAINEL = "2026-11-22g";
+export const VERSAO_PAINEL = "2026-11-22h";
 const CH = { sessao: "jarvis-social:sessao", demo: "jarvis-social:demo", modo: "jarvis-social:modo", rascunho: "jarvis-social:rascunho", email: "jarvis-social:email" };
 const ls = {
   ler(k, padrao = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch { return padrao; } },
@@ -574,8 +574,10 @@ telas.agenda = async (el, filtro = ls.ler("jarvis-social:filtro", "ativos")) => 
   el.innerHTML = `${faixaModo()}<h1>Agenda</h1><p class="fraco">Horários em ${esc(fuso())}. Esta é a fila do Jarvis; ela não aparece na tela "programados" do app do Instagram.</p>
     <div class="chips" role="group" aria-label="Filtro">${Object.keys(F).map((k) => `<button class="chip ${k === filtro ? "ativo" : ""}" data-filtro="${k}" aria-pressed="${k === filtro}">${k[0].toUpperCase() + k.slice(1)}</button>`).join("")}</div>
     ${contasUsaveis().length > 1 ? `<div class="chips" role="group" aria-label="Conta"><button class="chip ${!filtroConta ? "ativo" : ""}" data-fconta="">Todas as contas</button>${contasUsaveis().map((c) => `<button class="chip ${filtroConta === c.id ? "ativo" : ""}" data-fconta="${esc(c.id)}">@${esc(c.usuario_rede)}</button>`).join("")}</div>` : ""}
+    <button id="ver-grade" style="width:100%;margin-bottom:8px">▦ Grade dos próximos 14 dias</button>
     ${eu.org.fila_pausada ? `<div class="faixa">Fila pausada. <button data-fila="retomar">Retomar</button></div>` : `<button data-fila="pausar" style="width:100%">Pausar todas as próximas publicações</button>`}
     ${lista.length ? [...grupos].map(([d, ps]) => `<div class="dia">${esc(titulo(d))}</div>${ps.map((p) => cartaoPost(p)).join("")}`).join("") : `<p class="fraco">Nada aqui.</p>`}`;
+  $("#ver-grade").onclick = abrirGrade;
   el.querySelectorAll("[data-fconta]").forEach((b) => (b.onclick = () => { ls.gravar("jarvis-social:filtroConta", b.dataset.fconta); telas.agenda(el, filtro); }));
   el.querySelectorAll("[data-filtro]").forEach((b) => (b.onclick = () => { ls.gravar("jarvis-social:filtro", b.dataset.filtro); telas.agenda(el, b.dataset.filtro); }));
   el.querySelectorAll("[data-fila]").forEach((b) => (b.onclick = async () => { await cli.chamar("POST", `/v1/fila/${b.dataset.fila}`); eu = await cli.chamar("GET", "/v1/eu"); telas.agenda(el, filtro); }));
@@ -621,6 +623,15 @@ telas.ajustes = async (el) => {
       <p class="fraco">A conta padrão vem marcada em cada Novo Reel; dá para trocar na hora de programar e na edição.</p>
       ${eu.instagram_configurado ? `<button class="primario" id="conectar">${ativa ? "Conectar outra conta / reconectar" : "Conectar Instagram"}</button>` : `<div class="faixa">O app da Meta ainda não foi configurado no servidor. Passo a passo: docs/DEPLOY.md.</div>`}
       <p class="fraco">Conta profissional (criador ou empresa). A autorização é feita no próprio Instagram; o Jarvis nunca vê sua senha.</p></div>
+    <div class="cartao"><h2>Integrações: ChatGPT e Claude</h2>
+      <p class="fraco">Crie uma chave para o ChatGPT ou o Claude verem e preencherem a sua grade de Reels conversando com você. A chave vale só para este espaço; revogue quando quiser.</p>
+      <div id="chaves"></div>
+      <div class="linha"><input id="chave-nome" placeholder="Nome (ex.: Claude)" style="flex:1 1 100%">
+        <select id="chave-escopo" style="flex:1"><option value="programar">Ler e programar</option><option value="leitura">Só ler</option></select>
+        <select id="chave-dias" style="flex:1"><option value="90">90 dias</option><option value="30">30 dias</option><option value="365">1 ano</option></select></div>
+      <button class="primario" id="criar-chave" style="width:100%;margin-top:8px">Criar chave</button>
+      <div id="chave-nova"></div>
+      <p class="fraco">Passo a passo para conectar: docs/INTEGRACAO-ASSISTENTES.md.</p></div>
     <div class="cartao"><h2>Frequência</h2>
       <p class="fraco">Sem limite do Jarvis: quantos horários quiser por dia. A cota oficial do Instagram é consultada antes de cada envio.</p>
       <label>Horários</label><div class="chips" id="horarios">${pol.horarios.map((h) => `<button class="chip ativo" data-tirar="${h}" aria-label="Remover ${h}">${h} ✕</button>`).join("")}</div>
@@ -645,6 +656,18 @@ telas.ajustes = async (el) => {
       ${cli.modo === "demonstracao" ? `<button id="rodar-worker">Simular o worker agora</button> <button class="perigo" id="zerar-demo">Apagar dados da demonstração</button>${servidorConfigurado ? ` <button id="ir-servidor">Usar o servidor</button>` : ""}` : `<button id="sair">Sair</button> <button id="ir-demo">Abrir demonstração</button>`}
       <p class="fraco">Painel ${VERSAO_PAINEL} · API ${esc(eu.versao_api)}</p></div>`;
   $("#atraso").value = eu.org.politica_atraso;
+  desenharChaves();
+  $("#criar-chave").onclick = async () => {
+    try {
+      const r = await cli.chamar("POST", "/v1/chaves", { nome: $("#chave-nome").value || "Assistente", escopo: $("#chave-escopo").value, dias: +$("#chave-dias").value });
+      const base = CONFIG.supabaseUrl ? CONFIG.supabaseUrl.replace(/\/$/, "") : "https://SEU_REF.supabase.co";
+      $("#chave-nova").innerHTML = `<div class="faixa ok"><strong>Copie agora: a chave não aparece de novo.</strong>
+        <label>Chave (ChatGPT: Ações › Autenticação › Chave de API › Bearer)</label><textarea readonly style="min-height:70px">${esc(r.segredo)}</textarea>
+        <label>Endereço do conector (Claude: Conectores › Adicionar conector personalizado)</label><textarea readonly style="min-height:90px">${esc(base + "/functions/v1/mcp/" + r.segredo)}</textarea>
+        ${cli.modo === "demonstracao" ? "<p>Demonstração: a chave só existe neste aparelho; o conector funciona depois que o servidor estiver no ar.</p>" : ""}</div>`;
+      desenharChaves();
+    } catch (err) { alert(err.message); }
+  };
   const horarios = new Set(pol.horarios);
   el.querySelectorAll("[data-tirar]").forEach((b) => (b.onclick = () => { horarios.delete(b.dataset.tirar); b.remove(); }));
   $("#add-hora").onclick = () => { const v = $("#nova-hora").value; if (!v || horarios.has(v)) return; horarios.add(v); $("#horarios").insertAdjacentHTML("beforeend", `<button class="chip ativo" data-tirar="${v}">${v} ✕</button>`); $("#horarios").lastElementChild.onclick = (e) => { horarios.delete(v); e.target.remove(); }; };
@@ -793,6 +816,38 @@ function abrirPropaganda() {
     const capa = $("#pp-capa").files[0] || null;
     rodarTestePublicacao($("#tp-conta") && $("#tp-conta").value, { arquivos: { video, capa }, legenda: $("#pp-legenda").value, teste: false, nome: "a propaganda" });
   };
+}
+
+// ------------------------------------------------------------------ chaves de integração e grade
+async function desenharChaves() {
+  const alvo = $("#chaves"); if (!alvo) return;
+  try {
+    const { chaves } = await cli.chamar("GET", "/v1/chaves");
+    const data = (iso) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : "nunca");
+    alvo.innerHTML = chaves.length ? chaves.map((k) => `<div class="item" style="margin:8px 0;align-items:center"><div class="texto"><strong>${esc(k.nome)}</strong> <small>${esc(k.prefixo)}…</small><br>
+      <small>${k.revogado ? "revogada" : `${k.escopos.includes("programar") ? "ler e programar" : "só ler"} · vence ${data(k.expira_em)} · último uso ${data(k.ultimo_uso)}`}</small></div>
+      ${k.revogado ? "" : `<button class="perigo" data-revogar="${esc(k.id)}">Revogar</button>`}</div>`).join("") : `<p class="fraco">Nenhuma chave ainda.</p>`;
+    alvo.querySelectorAll("[data-revogar]").forEach((b) => (b.onclick = async () => { if (!confirm("Revogar esta chave? O assistente perde o acesso na hora.")) return; await cli.chamar("POST", `/v1/chaves/${b.dataset.revogar}/revogar`); desenharChaves(); }));
+  } catch (err) { alvo.innerHTML = `<div class="faixa erro">${mensagemErro(err)}</div>`; }
+}
+
+async function abrirGrade() {
+  const g = await cli.chamar("GET", "/v1/grade", null, { dias: 14 });
+  let dia = "";
+  const linhas = g.grade.map((s) => { const cab = s.data !== dia ? `<div class="dia">${esc(NOMES_DIA_LONGO[s.diaSemana])}, ${s.data.split("-").reverse().join("/")}</div>` : ""; dia = s.data;
+    return cab + `<p>${esc(s.hora)} — ${s.post ? `${selo(s.post)} ${esc(s.post.legenda || "(sem legenda)")}` : `<span class="fraco">livre</span>`}</p>`; }).join("");
+  abrirFolha(`<h2>Grade dos próximos ${g.dias} dias</h2>
+    <p>${g.politica.horarios.length} por dia (${esc(g.politica.horarios.join(", "))}) · <strong>${g.livres}</strong> livre(s) · <strong>${g.ocupados}</strong> ocupado(s) · ${g.rascunhos_esperando} rascunho(s) esperando</p>
+    ${g.fila_pausada ? `<div class="faixa">A fila está pausada.</div>` : ""}
+    ${g.rascunhos_esperando ? `<button class="primario" id="preencher" style="width:100%">Preencher a grade com os ${g.rascunhos_esperando} rascunho(s)</button><div id="preencher-msg"></div>` : ""}
+    <div class="cartao">${linhas || `<p class="fraco">Sem horários na frequência atual.</p>`}</div>
+    ${g.fora_da_grade.length ? `<h3>Fora da grade (horário escolhido à mão)</h3>${g.fora_da_grade.map((s) => `<p>${s.data.split("-").reverse().join("/")} ${esc(s.hora)} — ${selo(s.post)} ${esc(s.post.legenda)}</p>`).join("")}` : ""}
+    <button class="grande" id="fechar-grade" style="margin-top:8px">Fechar</button>`);
+  $("#fechar-grade").onclick = () => { fecharFolha(); mostrar(); };
+  $("#preencher") && ($("#preencher").onclick = async () => {
+    try { const r = await cli.chamar("POST", "/v1/grade/preencher", {}); fecharFolha(); await abrirGrade(); $("#folha-conteudo").insertAdjacentHTML("afterbegin", `<div class="faixa ok">${r.programados.length} programado(s)${r.erros.length ? `, ${r.erros.length} com erro` : ""}.</div>`); }
+    catch (err) { $("#preencher-msg").innerHTML = `<div class="faixa erro">${mensagemErro(err)}</div>`; }
+  });
 }
 
 // ------------------------------------------------------------------ painel de usuários (só o dono)

@@ -30,7 +30,8 @@ teste(".nojekyll presente (o Pages ignoraria _compartilhado/ sem ele)", () => ve
 teste("todo módulo compartilhado importado está na casca do SW", () => {
   const sw = fs.readFileSync(path.join(RAIZ, "sw.js"), "utf8");
   const pasta = path.join(RAIZ, "supabase/functions/_compartilhado");
-  for (const f of fs.readdirSync(pasta).filter((x) => x.endsWith(".js"))) verdade(sw.includes("_compartilhado/" + f), "falta no sw.js: " + f);
+  const SO_SERVIDOR = ["mcp.js", "servidor.js"]; // não rodam no navegador
+  for (const f of fs.readdirSync(pasta).filter((x) => x.endsWith(".js") && !SO_SERVIDOR.includes(x))) verdade(sw.includes("_compartilhado/" + f), "falta no sw.js: " + f);
 });
 teste("todo arquivo da casca do SW existe", () => {
   const sw = fs.readFileSync(path.join(RAIZ, "sw.js"), "utf8");
@@ -122,6 +123,15 @@ if (pw) {
       await pg.locator("[data-filtro=publicados]").click();
       await pg.getByText("Publicação simulada (sem link real)").first().waitFor();
       igual(await pg.getByText("Ver no Instagram").count(), 0, "post simulado nunca ganha link de Instagram");
+      // Grade e chave de integração pelo painel
+      await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#agenda`);
+      await pg.click("#ver-grade"); await pg.getByRole("heading", { name: "Grade dos próximos 14 dias" }).waitFor();
+      await pg.click("#fechar-grade");
+      await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#ajustes`);
+      await pg.fill("#chave-nome", "Claude"); await pg.click("#criar-chave");
+      verdade(/^js_[0-9a-f]{48}$/.test(await pg.locator("#chave-nova textarea").first().inputValue()), "chave mostrada uma vez");
+      verdade((await pg.locator("#chave-nova textarea").nth(1).inputValue()).includes("/functions/v1/mcp/js_"), "endereço do conector");
+      await pg.locator("#chaves").getByText("Claude").waitFor();
       // Lançar propaganda (demonstração): escolhe o vídeo, legenda pronta, publica agora.
       await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
       await pg.click("#lancar-propaganda");

@@ -95,7 +95,7 @@ jobs:
           supabase secrets set --project-ref "$REF" "${ARGS[@]}"
       - name: Funções (api e worker)
         if: steps.seg.outputs.ok == '1'
-        run: supabase functions deploy api worker --project-ref "$REF" --use-api
+        run: supabase functions deploy api worker mcp --project-ref "$REF" --use-api
       - name: Relógio do worker (pg_cron, a cada minuto) e login (URL do painel)
         if: steps.seg.outputs.ok == '1'
         run: |
@@ -126,10 +126,11 @@ jobs:
             supabaseAnon: "$ANON",
           };
           EOF2
-          if ! git diff --quiet config.js; then
+          sed -i "s#https://SEU_REF.supabase.co#https://$REF.supabase.co#" openapi-chatgpt.json
+          if ! git diff --quiet config.js openapi-chatgpt.json; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add config.js
+            git add config.js openapi-chatgpt.json
             git commit -m "Jarvis Social: endereço do servidor no painel"
             git push
           fi

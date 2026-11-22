@@ -58,6 +58,9 @@ branco sobre o degradê ≥ 4,7:1): mudou uma cor, meça de novo.
   `exigirLiberado`; só `/v1/conta/*`, `/v1/admin/*` (dono), saúde e retorno
   do OAuth ficam fora. Dono = `JS_EMAIL_DONO` **com e-mail confirmado**.
   Termos em `termos.js`: mudou o texto, suba a versão; aceites não se apagam.
+- Chave de integração (ChatGPT/Claude): só `ROTAS_DA_CHAVE`, só o espaço
+  dela, escopo checado em toda mutação; nunca guarde o segredo, só o hash.
+  O MCP (`mcp.js`) chama `api.tratar` com a chave: regra nova vale para os dois.
 - Sem teto comercial de publicações; só o limite técnico de 48/dia e a cota da rede.
 - Fuso padrão America/Sao_Paulo; banco em UTC; nunca o fuso da máquina.
 - Nada pago sem autorização do dono.

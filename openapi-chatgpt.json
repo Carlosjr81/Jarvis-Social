@@ -1,0 +1,686 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "Jarvis Social — grade de Reels",
+  "version": "2026-11-22h",
+  "description": "Ações para um GPT gerenciar a grade de Reels do Instagram pelo Jarvis Social. Autenticação: chave de integração (Bearer js_...) criada no painel."
+ },
+ "servers": [
+  {
+   "url": "https://SEU_REF.supabase.co/functions/v1/api"
+  }
+ ],
+ "components": {
+  "securitySchemes": {
+   "chave": {
+    "type": "http",
+    "scheme": "bearer"
+   }
+  },
+  "schemas": {}
+ },
+ "security": [
+  {
+   "chave": []
+  }
+ ],
+ "paths": {
+  "/v1/grade": {
+   "get": {
+    "operationId": "verGrade",
+    "summary": "Grade de publicação futura",
+    "description": "Horários da frequência nos próximos dias, livres ou ocupados, posts fora da grade e rascunhos esperando. Use primeiro.",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "dias",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 60
+      }
+     }
+    ]
+   }
+  },
+  "/v1/grade/preencher": {
+   "post": {
+    "operationId": "preencherGrade",
+    "summary": "Preencher a grade",
+    "description": "Encaixa os rascunhos com vídeo nos próximos horários livres.",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "post_ids": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "limite": {
+          "type": "integer"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/posts": {
+   "get": {
+    "operationId": "verAgenda",
+    "summary": "Agenda",
+    "description": "Publicações entre duas datas (ou por estado, ex.: estado=draft para rascunhos).",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "de",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "description": "AAAA-MM-DD, fuso do espaço"
+      }
+     },
+     {
+      "name": "ate",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "description": "AAAA-MM-DD, fuso do espaço"
+      }
+     },
+     {
+      "name": "estado",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "incluir_rascunhos",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   },
+   "post": {
+    "operationId": "criarRascunho",
+    "summary": "Criar rascunho",
+    "description": "Rascunho a partir de um vídeo da biblioteca (agendar=false). chave_idempotencia única por pedido.",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "video_id",
+         "legenda",
+         "chave_idempotencia"
+        ],
+        "properties": {
+         "video_id": {
+          "type": "string"
+         },
+         "capa_id": {
+          "type": "string"
+         },
+         "conta_id": {
+          "type": "string"
+         },
+         "legenda": {
+          "type": "string"
+         },
+         "agendar": {
+          "type": "boolean"
+         },
+         "chave_idempotencia": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/posts/{id}": {
+   "get": {
+    "operationId": "verPublicacao",
+    "summary": "Ver publicação",
+    "description": "Detalhes, histórico e recibo (permalink quando publicada).",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "post_id"
+     }
+    ]
+   },
+   "patch": {
+    "operationId": "editarPublicacao",
+    "summary": "Editar publicação",
+    "description": "Muda legenda e/ou data e hora. Exige a versao atual (leia com verPublicacao).",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "versao"
+        ],
+        "properties": {
+         "versao": {
+          "type": "integer"
+         },
+         "legenda": {
+          "type": "string"
+         },
+         "data": {
+          "type": "string",
+          "description": "AAAA-MM-DD, fuso do espaço"
+         },
+         "hora": {
+          "type": "string",
+          "description": "HH:MM"
+         }
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "post_id"
+     }
+    ]
+   }
+  },
+  "/v1/posts/{id}/agendar": {
+   "post": {
+    "operationId": "programar",
+    "summary": "Programar",
+    "description": "Com data e hora, ou proximo_livre: true.",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "data": {
+          "type": "string",
+          "description": "AAAA-MM-DD, fuso do espaço"
+         },
+         "hora": {
+          "type": "string",
+          "description": "HH:MM"
+         },
+         "proximo_livre": {
+          "type": "boolean"
+         }
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "post_id"
+     }
+    ]
+   }
+  },
+  "/v1/posts/{id}/pausar": {
+   "post": {
+    "operationId": "pausarPublicacao",
+    "summary": "Pausar",
+    "description": "Pausa uma publicação programada.",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "post_id"
+     }
+    ]
+   }
+  },
+  "/v1/posts/{id}/retomar": {
+   "post": {
+    "operationId": "retomarPublicacao",
+    "summary": "Retomar",
+    "description": "Retoma uma publicação pausada.",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "post_id"
+     }
+    ]
+   }
+  },
+  "/v1/posts/{id}/cancelar": {
+   "post": {
+    "operationId": "cancelarPublicacao",
+    "summary": "Cancelar",
+    "description": "Cancela (confirme com o dono antes).",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "post_id"
+     }
+    ]
+   }
+  },
+  "/v1/midias": {
+   "get": {
+    "operationId": "listarVideos",
+    "summary": "Biblioteca",
+    "description": "Vídeos e capas enviados pelo painel.",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/frequencia/previa": {
+   "post": {
+    "operationId": "previaFrequencia",
+    "summary": "Prévia da frequência",
+    "description": "O que muda na grade com novos horários/dias. Mostre ao dono antes de aplicar.",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "politica": {
+          "type": "object",
+          "properties": {
+           "horarios": {
+            "type": "array",
+            "items": {
+             "type": "string",
+             "description": "HH:MM"
+            }
+           },
+           "dias": {
+            "type": "array",
+            "items": {
+             "type": "integer"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/frequencia": {
+   "put": {
+    "operationId": "aplicarFrequencia",
+    "summary": "Aplicar frequência",
+    "description": "Exige hash_previa da prévia quando algo muda.",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "politica": {
+          "type": "object",
+          "properties": {
+           "horarios": {
+            "type": "array",
+            "items": {
+             "type": "string",
+             "description": "HH:MM"
+            }
+           },
+           "dias": {
+            "type": "array",
+            "items": {
+             "type": "integer"
+            }
+           }
+          }
+         },
+         "hash_previa": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/fila/pausar": {
+   "post": {
+    "operationId": "pausarFila",
+    "summary": "Pausar a fila",
+    "description": "Pausa todas as próximas publicações.",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/fila/retomar": {
+   "post": {
+    "operationId": "retomarFila",
+    "summary": "Retomar a fila",
+    "description": "Retoma a fila.",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/comandos": {
+   "post": {
+    "operationId": "comando",
+    "summary": "Comando em português",
+    "description": "Ex.: 'Programe este vídeo amanhã às 10h'. Se pedir confirmação, repita com confirmar=true e hash_previa.",
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "texto"
+        ],
+        "properties": {
+         "texto": {
+          "type": "string"
+         },
+         "post_id": {
+          "type": "string"
+         },
+         "confirmar": {
+          "type": "boolean"
+         },
+         "hash_previa": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}

@@ -6,7 +6,7 @@
 // Tenant: SEMPRE derivado da sessão (membros do usuário). Um `org_id` enviado
 // pelo cliente só escolhe entre as organizações de que ele já é membro.
 import { FUSO_PADRAO, localParaUtc, utcParaLocal, formatarLocal, somarDias, fusoValido, ErroHorario } from "./tempo.js";
-import { politicaPadrao, validarPolitica, proximoSlotLivre, preverMudanca } from "./frequencia.js";
+import { politicaPadrao, validarPolitica, proximoSlotLivre, preverMudanca, gerarSlots } from "./frequencia.js";
 import { ESTADOS, EDITAVEIS, CANCELAVEIS, transicao, ErroEstado } from "./estados.js";
 import { interpretar, AJUDA } from "./comandos.js";
 import { ErroBanco } from "./banco.js";
@@ -59,7 +59,8 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     if (!usuario || !usuario.id) falha(401, "nao_autenticado", "Entre na sua conta.");
     const membros = await banco.listar("membros", { usuario_id: usuario.id });
     if (!membros.length) falha(403, "sem_organizacao", "Crie seu espaço para começar.");
-    const m = orgPedida ? membros.find((x) => x.org_id === orgPedida) : membros[0];
+    const alvo = usuario.org_token || orgPedida; // chave de integração vale só para o espaço dela
+    const m = alvo ? membros.find((x) => x.org_id === alvo) : membros[0];
     if (!m) falha(404, "nao_encontrado", "Organização não encontrada."); // não revela se existe
     const org = await banco.obter("organizacoes", m.org_id);
     return { usuario, membro: m, org, papel: m.papel, membros };
@@ -364,7 +365,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
   // --- frequência
   op.previaFrequencia = async (ctx, politica) => {
     let pol;
-    try { pol = validarPolitica({ fuso: ctx.org.fuso || FUSO_PADRAO, ...politica }); } catch (e) { falha(400, "politica_invalida", e.message); }
+    try { pol = validarPolitica({ ...(ctx.org.politica || politicaPadrao(ctx.org.fuso || FUSO_PADRAO)), fuso: ctx.org.fuso || FUSO_PADRAO, ...politica }); } catch (e) { falha(400, "politica_invalida", e.message); }
     const posts = await banco.listar("posts", { org_id: ctx.org.id, estado: { in: ["scheduled", "paused", "preparing", "processing", "publishing", "retry_wait", "needs_reconciliation", "published"] } });
     const prev = preverMudanca(posts, pol, agora());
     const fuso = pol.fuso;
@@ -448,6 +449,59 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     }
   };
 
+  // --- a grade de publicação: os próximos horários da frequência, livres ou ocupados
+  op.grade = async (ctx, q) => {
+    const fuso = ctx.org.fuso || FUSO_PADRAO;
+    const dias = Math.max(1, Math.min(60, +q.dias || 14));
+    const t0 = agora(), t1 = new Date(Date.parse(t0) + dias * 864e5).toISOString();
+    const pol = ctx.org.politica || politicaPadrao(fuso);
+    const slots = gerarSlots(pol, t0, t1);
+    const posts = (await banco.listar("posts", { org_id: ctx.org.id, agendado_utc: { gte: t0, lt: t1 } }, { ordem: "agendado_utc" })).filter((p) => p.estado !== "cancelled");
+    const porHora = new Map(posts.map((p) => [new Date(p.agendado_utc).toISOString(), p]));
+    const resumo = (p) => p && { id: p.id, estado: p.estado, estado_texto: ESTADOS[p.estado], legenda: (p.legenda || "").slice(0, 80), conta_id: p.conta_id };
+    const grade = slots.map((u) => ({ utc: u, ...utcParaLocal(u, fuso), post: resumo(porHora.get(u)) || null }));
+    const foraDaGrade = posts.filter((p) => !slots.includes(new Date(p.agendado_utc).toISOString())).map((p) => ({ utc: p.agendado_utc, ...utcParaLocal(p.agendado_utc, fuso), post: resumo(p) }));
+    const rascunhos = (await banco.listar("posts", { org_id: ctx.org.id, estado: "draft" })).length;
+    return { fuso, politica: pol, dias, livres: grade.filter((g) => !g.post).length, ocupados: grade.filter((g) => g.post).length, rascunhos_esperando: rascunhos, fila_pausada: !!ctx.org.fila_pausada, grade, fora_da_grade: foraDaGrade };
+  };
+  // Encaixa rascunhos (com vídeo) nos próximos horários livres, na ordem em que foram criados.
+  op.preencherGrade = async (ctx, c) => {
+    exigir(ctx, PAPEIS_EDICAO);
+    let lista = await banco.listar("posts", { org_id: ctx.org.id, estado: "draft" }, { ordem: "criado_em" });
+    if (Array.isArray(c.post_ids) && c.post_ids.length) lista = c.post_ids.map((id) => lista.find((p) => p.id === id)).filter(Boolean);
+    lista = lista.filter((p) => p.video_id).slice(0, Math.max(1, Math.min(50, +c.limite || 50)));
+    const feitos = [], erros = [];
+    for (const p of lista) {
+      try { const r = await op.agendarPost(ctx, p.id, { proximo_livre: true, motivo: "grade preenchida" }); feitos.push({ post_id: p.id, agendado_local: r.post.recibo.agendado_local, perfil: r.post.recibo.perfil }); }
+      catch (e) { if (e instanceof ErroApi) erros.push({ post_id: p.id, erro: e.message }); else throw e; }
+    }
+    return { programados: feitos, erros };
+  };
+
+  // --- chaves de integração (ChatGPT, Claude, outros clientes da API)
+  op.criarChave = async (ctx, c) => {
+    exigir(ctx, PAPEIS_EDICAO);
+    if (ctx.usuario.via_token) falha(403, "so_sessao", "Chaves só são criadas pelo painel, com login.");
+    const escopos = c.escopo === "leitura" ? ["leitura"] : ["leitura", "programar"];
+    const dias = [30, 90, 365].includes(+c.dias) ? +c.dias : 90;
+    const bytes = crypto.getRandomValues(new Uint8Array(24));
+    const segredo = "js_" + [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const chave = await banco.inserir("tokens_api", {
+      org_id: ctx.org.id, usuario_id: ctx.usuario.id, nome: String(c.nome || "Assistente").slice(0, 60), prefixo: segredo.slice(0, 10),
+      hash: await sha256Hex(segredo), escopos, criado_em: agora(), expira_em: new Date(Date.parse(agora()) + dias * 864e5).toISOString(), ultimo_uso: null, revogado: false,
+    });
+    const { hash, ...publica } = chave;
+    return { chave: publica, segredo, aviso: "Copie agora: esta chave não aparece de novo. Quem tiver a chave programa no seu Instagram; revogue se vazar." };
+  };
+  op.listarChaves = async (ctx) => ({ chaves: (await banco.listar("tokens_api", { org_id: ctx.org.id }, { ordem: "criado_em", desc: true })).map(({ hash, ...x }) => x) });
+  op.revogarChave = async (ctx, id) => {
+    exigir(ctx, PAPEIS_EDICAO);
+    const k = await banco.obter("tokens_api", id);
+    if (!k || k.org_id !== ctx.org.id) falha(404, "chave", "Chave não encontrada.");
+    const { hash, ...x } = await banco.atualizar("tokens_api", id, { revogado: true, revogado_em: agora() });
+    return { chave: x };
+  };
+
   // Acorda o worker na hora (teste imediato), sem esperar o relógio de 1 min.
   // No máximo uma vez a cada 15 s por espaço; o worker só faz o que já está vencido.
   const ultimoCutucao = new Map();
@@ -509,8 +563,21 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
   };
 
   // ------------------------------------------------------------ roteador HTTP
-  async function tratar({ metodo, caminho, consulta = {}, corpo = {}, usuario = null }) {
+  // Uma chave de integração vira um "usuário" limitado: só o espaço dela, só os escopos dela.
+  const ROTAS_DA_CHAVE = ["eu", "posts", "grade", "frequencia", "fila", "comandos", "midias", "saude"];
+  async function usuarioDaChave(segredo) {
+    if (!/^js_[0-9a-f]{48}$/.test(String(segredo || ""))) falha(401, "chave_invalida", "Chave de integração inválida.");
+    const [k] = await banco.listar("tokens_api", { hash: await sha256Hex(segredo) });
+    if (!k || k.revogado) falha(401, "chave_invalida", "Chave de integração inválida ou revogada.");
+    if (k.expira_em && k.expira_em < agora()) falha(401, "chave_vencida", "Chave de integração vencida: crie outra no painel.");
+    const conta = await banco.obter("contas", k.usuario_id);
+    if (!k.ultimo_uso || Date.parse(agora()) - Date.parse(k.ultimo_uso) > 60e3) await banco.atualizar("tokens_api", k.id, { ultimo_uso: agora() });
+    return { id: k.usuario_id, email: conta ? conta.email : "", email_confirmado: true, via_token: true, escopos: k.escopos || [], org_token: k.org_id, chave_id: k.id };
+  }
+
+  async function tratar({ metodo, caminho, consulta = {}, corpo = {}, usuario = null, token = null }) {
     try {
+      if (token && !usuario) usuario = await usuarioDaChave(token);
       const partes = caminho.replace(/^\/+|\/+$/g, "").split("/");
       if (partes[0] === "api") partes.shift();
       if (partes[0] !== "v1") falha(404, "rota", "Use /v1/...");
@@ -519,6 +586,11 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
       const org = consulta.org_id || corpo.org_id;
       const ctx = () => contexto(usuario, org);
       let res;
+      if (usuario && usuario.via_token) {
+        if (!ROTAS_DA_CHAVE.includes(r1)) falha(403, "fora_do_escopo", "Esta ação só pode ser feita no painel, com login.");
+        if (M !== "GET" && !(r1 === "frequencia" && r2 === "previa") && !usuario.escopos.includes("programar")) falha(403, "so_leitura", "Esta chave é só de leitura.");
+        if (r1 === "midias" && M !== "GET") falha(403, "fora_do_escopo", "Envie vídeos pelo painel; o assistente programa o que já está na biblioteca.");
+      }
       const livre = r1 === "saude" || (r1 === "instagram" && r2 === "retorno") || r1 === "conta" || r1 === "admin";
       if (!livre) await acesso.exigirLiberado(usuario);
       if (r1 === "saude") res = { ok: true, modo, versao_api: VERSAO_API, agora: agora() };
@@ -543,6 +615,11 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
       else if (r1 === "frequencia" && r2 === "previa" && M === "POST") res = await op.previaFrequencia(await ctx(), corpo.politica || {});
       else if (r1 === "frequencia" && !r2 && M === "PUT") res = await op.aplicarFrequencia(await ctx(), corpo.politica || {}, corpo.hash_previa);
       else if (r1 === "fila" && (r2 === "pausar" || r2 === "retomar") && M === "POST") res = await op.pausarFila(await ctx(), r2 === "pausar");
+      else if (r1 === "grade" && !r2 && M === "GET") res = await op.grade(await ctx(), consulta);
+      else if (r1 === "grade" && r2 === "preencher" && M === "POST") res = await op.preencherGrade(await ctx(), corpo);
+      else if (r1 === "chaves" && !r2 && M === "GET") res = await op.listarChaves(await ctx());
+      else if (r1 === "chaves" && !r2 && M === "POST") res = await op.criarChave(await ctx(), corpo);
+      else if (r1 === "chaves" && r3 === "revogar" && M === "POST") res = await op.revogarChave(await ctx(), r2);
       else if (r1 === "worker" && r2 === "cutucar" && M === "POST") res = await op.cutucar(await ctx());
       else if (r1 === "comandos" && M === "POST") res = await op.comando(await ctx(), corpo);
       else if (r1 === "instagram" && r2 === "conectar" && M === "POST") res = await op.conectarInstagram(await ctx(), corpo);

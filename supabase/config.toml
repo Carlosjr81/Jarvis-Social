@@ -9,3 +9,7 @@ verify_jwt = false
 [functions.worker]
 # Protegido pelo cabeçalho x-jarvis-worker (segredo JS_SEGREDO_WORKER).
 verify_jwt = false
+
+[functions.mcp]
+# Protegido pela chave de integração (no caminho ou no Authorization).
+verify_jwt = false

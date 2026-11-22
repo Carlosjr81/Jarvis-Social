@@ -8,6 +8,7 @@ const SUITES = [
   ["teste-nucleo", "fusos, frequência, comandos, estados, cifra"],
   ["teste-api", "agendamento, isolamento, idempotência, frequência, comandos, OAuth"],
   ["teste-acesso", "cadastro com aprovação, termos, prazos, cobrança Pix, painel do dono, contas"],
+  ["teste-integracao", "chaves, grade de publicação e conector MCP (ChatGPT e Claude)"],
   ["teste-worker", "publicação, reconciliação, falhas, lease, atraso"],
   ["teste-sql", "migração e fila no PostgreSQL real"],
   ["teste-web", "painel: sintaxe, PWA, demonstração rotulada"],
