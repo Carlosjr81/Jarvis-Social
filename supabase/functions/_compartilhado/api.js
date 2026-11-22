@@ -49,7 +49,7 @@ export function horariosPadrao(n, atuais = []) {
   return Array.from({ length: n }, (_, i) => { const m = Math.round((ini + passo * i) / 5) * 5; return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`; });
 }
 
-export function criarApi({ banco, armazenamento, instagram, agora = () => new Date().toISOString(), segredos = {}, modo = "producao", limites = {}, autenticacao = null }) {
+export function criarApi({ banco, armazenamento, instagram, agora = () => new Date().toISOString(), segredos = {}, modo = "producao", limites = {}, autenticacao = null, cutucarWorker = null }) {
   const demonstracao = modo === "demonstracao";
   const acesso = criarAcesso({ banco, agora, segredos, demonstracao, autenticacao });
   const LIM = { videoBytes: 50 * 1024 * 1024, capaBytes: 8 * 1024 * 1024, antecedenciaMin: 2, ...limites };
@@ -103,8 +103,10 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     return ps.filter((p) => p.id !== excetoId && p.agendado_utc).map((p) => p.agendado_utc);
   }
 
-  async function resolverHorario(ctx, { data, hora, proximo_livre }, excetoId) {
+  async function resolverHorario(ctx, { data, hora, proximo_livre, publicar_agora }, excetoId) {
     const fuso = ctx.org.fuso || FUSO_PADRAO;
+    // "Publicar agora" (teste imediato): o horário é este instante e o worker é acordado.
+    if (publicar_agora) return { agendado_utc: agora(), origem_horario: "manual", fuso };
     if (proximo_livre) {
       const s = proximoSlotLivre(ctx.org.politica || politicaPadrao(fuso), await ocupados(ctx.org.id, excetoId), agora());
       if (!s) falha(409, "sem_horario_livre", "Não há horário livre na frequência atual.");
@@ -138,7 +140,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
       : post.estado === "scheduled" ? "agendamento_confirmado_no_jarvis"
       : "nao_confirmado";
     return {
-      post_id: post.id, versao: post.versao, estado: post.estado, estado_texto: ESTADOS[post.estado],
+      post_id: post.id, versao: post.versao, estado: post.estado, estado_texto: ESTADOS[post.estado], teste: !!post.teste,
       confirmacao,
       aviso: confirmacao === "demonstracao" ? "DEMONSTRAÇÃO: nada foi enviado ao Instagram."
         : confirmacao === "agendamento_confirmado_no_jarvis" ? "Gravado no servidor do Jarvis. O Instagram não tem fila nativa pela API: o Jarvis publica no horário e só então haverá permalink."
@@ -240,7 +242,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
   op.criarPost = async (ctx, c) => {
     exigir(ctx, PAPEIS_EDICAO);
     if (!c.chave_idempotencia || String(c.chave_idempotencia).length > 100) falha(400, "falta_chave", "Envie chave_idempotencia (um identificador único por pedido).");
-    const pedido = { conta_id: c.conta_id, video_id: c.video_id, capa_id: c.capa_id, legenda: c.legenda ?? "", data: c.data, hora: c.hora, proximo_livre: !!c.proximo_livre, agendar: !!c.agendar, fonte: c.fonte };
+    const pedido = { conta_id: c.conta_id, video_id: c.video_id, capa_id: c.capa_id, legenda: c.legenda ?? "", data: c.data, hora: c.hora, proximo_livre: !!c.proximo_livre, publicar_agora: !!c.publicar_agora, agendar: !!c.agendar || !!c.publicar_agora, fonte: c.fonte, teste: !!c.teste };
     const hash = await sha256Hex(canonico(pedido));
     const existentes = await banco.listar("posts", { org_id: ctx.org.id, chave_idempotencia: c.chave_idempotencia });
     if (existentes.length) {
@@ -261,7 +263,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
         org_id: ctx.org.id, conta_id: conta ? conta.id : null, video_id: video.id, capa_id: capa ? capa.id : null,
         legenda: pedido.legenda, ...horario, estado: pedido.agendar ? "scheduled" : "draft", versao: 1,
         chave_idempotencia: c.chave_idempotencia, hash_pedido: hash, container_id: null, media_id: null, permalink: null,
-        publicado_em: null, tentativas: 0, ultimo_erro: null, fonte: c.fonte || null, simulado: demonstracao,
+        publicado_em: null, tentativas: 0, ultimo_erro: null, fonte: c.fonte || null, simulado: demonstracao, teste: !!c.teste,
         criado_por: ctx.usuario.id, criado_em: agoraIso, atualizado_em: agoraIso,
       });
     } catch (e) {
@@ -446,6 +448,19 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     }
   };
 
+  // Acorda o worker na hora (teste imediato), sem esperar o relógio de 1 min.
+  // No máximo uma vez a cada 15 s por espaço; o worker só faz o que já está vencido.
+  const ultimoCutucao = new Map();
+  op.cutucar = async (ctx) => {
+    exigir(ctx, PAPEIS_EDICAO);
+    if (!cutucarWorker) return { cutucado: false, motivo: "O relógio do servidor (1 min) cuida disso." };
+    const t = Date.parse(agora());
+    if (!demonstracao && t - (ultimoCutucao.get(ctx.org.id) || 0) < 15000) return { cutucado: false, motivo: "aguarde alguns segundos" };
+    ultimoCutucao.set(ctx.org.id, t);
+    const r = await cutucarWorker();
+    return { cutucado: true, resultado: r };
+  };
+
   // --- Instagram (OAuth oficial)
   op.conectarInstagram = async (ctx, corpo = {}) => {
     exigir(ctx, PAPEIS_ADMIN);
@@ -528,6 +543,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
       else if (r1 === "frequencia" && r2 === "previa" && M === "POST") res = await op.previaFrequencia(await ctx(), corpo.politica || {});
       else if (r1 === "frequencia" && !r2 && M === "PUT") res = await op.aplicarFrequencia(await ctx(), corpo.politica || {}, corpo.hash_previa);
       else if (r1 === "fila" && (r2 === "pausar" || r2 === "retomar") && M === "POST") res = await op.pausarFila(await ctx(), r2 === "pausar");
+      else if (r1 === "worker" && r2 === "cutucar" && M === "POST") res = await op.cutucar(await ctx());
       else if (r1 === "comandos" && M === "POST") res = await op.comando(await ctx(), corpo);
       else if (r1 === "instagram" && r2 === "conectar" && M === "POST") res = await op.conectarInstagram(await ctx(), corpo);
       else if (r1 === "instagram" && r3 === "desconectar" && M === "POST") res = await op.desconectarInstagram(await ctx(), r2);

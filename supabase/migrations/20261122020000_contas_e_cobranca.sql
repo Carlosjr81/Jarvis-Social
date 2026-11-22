@@ -60,3 +60,6 @@ do $$ begin
     revoke all on contas, config_plataforma, pagamentos, aceites from anon, authenticated;
   end if;
 end $$;
+
+-- Publicação de teste (botão "Teste de publicação imediato"): marcada no post e no recibo.
+alter table posts add column teste boolean not null default false;

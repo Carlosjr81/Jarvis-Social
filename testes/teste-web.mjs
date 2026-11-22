@@ -53,6 +53,7 @@ if (pw) {
       const ctx = await nav.newContext({ viewport: { width: 360, height: 740 }, locale: "pt-BR", timezoneId: "Asia/Tokyo" });
       const pg = await ctx.newPage();
       const erros = []; pg.on("pageerror", (e) => erros.push(e.message));
+      fs.mkdirSync(path.join(RAIZ, "testes/saida"), { recursive: true });
       pg.on("dialog", (d) => d.type() === "prompt" ? d.accept(d.message().includes("Qual @") ? "loja.exemplo" : d.defaultValue()) : d.accept());
       await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
       // Na demonstração você é o dono: entra direto (o dono não aceita os próprios termos).
@@ -100,6 +101,14 @@ if (pw) {
       await pg.fill("#cmd", "Altere para dois vídeos por dia"); await pg.click("#f-cmd button");
       await pg.getByText("Nova frequência: 2 por dia").waitFor();
       await pg.click("#cmd-sim"); await pg.getByText("Frequência alterada").waitFor();
+      // Teste de publicação imediato (demonstração): todas as etapas até "publicado".
+      await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
+      await pg.click("#teste-imediato"); await pg.getByText("Teste de publicação imediato").first().waitFor();
+      await pg.click("#tp-ir");
+      await pg.locator("#tp-fim", { hasText: "Demonstração (simulado)" }).waitFor({ timeout: 30000 });
+      igual(await pg.locator("#tp-etapas p", { hasText: "✅" }).count(), 6, "seis etapas concluídas");
+      await pg.screenshot({ path: path.join(RAIZ, "testes/saida/teste-imediato-360.png"), fullPage: true });
+      await pg.click("#tp-fechar");
       // Painel de usuários do dono: simular um cadastro e liberar por 30 dias.
       await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#usuarios`);
       await pg.getByRole("heading", { name: "Painel de usuários" }).waitFor();
@@ -108,7 +117,6 @@ if (pw) {
       await pg.selectOption("#g-prazo", "30"); await pg.click('[data-a="liberar"]');
       await pg.locator('[data-f="todos"]').click();
       await pg.locator(".selo.scheduled", { hasText: "Liberado" }).first().waitFor();
-      fs.mkdirSync(path.join(RAIZ, "testes/saida"), { recursive: true });
       await pg.screenshot({ path: path.join(RAIZ, "testes/saida/usuarios-360.png"), fullPage: true });
       await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
       await pg.screenshot({ path: path.join(RAIZ, "testes/saida/inicio-360.png"), fullPage: true });

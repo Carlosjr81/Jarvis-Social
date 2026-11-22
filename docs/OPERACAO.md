@@ -9,6 +9,13 @@
   depois do passo 0 do `DEPLOY.md`). Agendar NÃO cria commit: é um pedido
   autenticado gravado no servidor e relido antes de confirmar.
 
+## Teste de publicação imediato
+Início › **🧪 Teste de publicação imediato** › escolha a conta › Publicar o
+teste agora. Publica na hora um Reel de 6 s com a capa "Teste de publicação —
+Jarvis Mídia Social" e uma legenda que explica o teste, e mostra cada etapa
+(mídia, envio, publicação criada, servidor acordado, Instagram) até o link do
+post. Na demonstração tudo é simulado e a tela diz isso.
+
 ## Cadastro e usuários
 - Quem abre o painel cria a conta (nome, e-mail, senha) e espera a sua
   liberação; a tela confere sozinha a cada 30 s. Depois aceita os termos.

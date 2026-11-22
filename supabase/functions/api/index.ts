@@ -21,6 +21,12 @@ const api = criarApi({
     emailsDono: env("JS_EMAIL_DONO").split(",").map((s) => s.trim()).filter(Boolean),
   },
   limites: { videoBytes: Number(env("JS_LIMITE_VIDEO_MB") || 50) * 1048576 },
+  // "Teste de publicação imediato": acorda a função worker com o segredo dela.
+  async cutucarWorker() {
+    const r = await fetch(`${URL_SB}/functions/v1/worker`, { method: "POST", headers: { "x-jarvis-worker": env("JS_SEGREDO_WORKER") } });
+    const j = await r.json().catch(() => ({}));
+    return { status: r.status, reivindicados: j.reivindicados, resultados: (j.resultados || []).map((x: { resultado: string }) => x.resultado) };
+  },
   // Ações que só o Auth do Supabase faz: link de nova senha e apagar o login (LGPD).
   autenticacao: {
     async enviarLinkSenha(email: string) {

@@ -174,4 +174,22 @@ teste("fila extensa (200 posts, 4 por dia) sem duplicar horários", async () => 
   igual(new Set(hs).size, 200);
 });
 
+teste("teste imediato: publicar agora + acordar o worker publica sem esperar o relógio", async () => {
+  const { ambiente: amb, A: U } = await import("./ambiente.mjs");
+  const { criarApi } = await import("../supabase/functions/_compartilhado/api.js");
+  const e = amb(); const { video, capa } = await e.preparar(U);
+  let cutucadas = 0;
+  const api2 = criarApi({ banco: e.banco, armazenamento: e.arm, instagram: e.ig, agora: e.relogio, segredos: { emailsDono: [] },
+    cutucarWorker: async () => { cutucadas++; return e.worker().rodar(); } });
+  const ch = async (m, c, corpo) => (await api2.tratar({ metodo: m, caminho: c, corpo: corpo || {}, usuario: U })).corpo;
+  const { post } = await ch("POST", "/v1/posts", { video_id: video.id, capa_id: capa.id, legenda: "🧪 teste", publicar_agora: true, teste: true, chave_idempotencia: "tp1" });
+  igual([post.estado, post.agendado_utc, post.recibo.teste], ["scheduled", e.rel.t, true]);
+  await ch("POST", "/v1/worker/cutucar");
+  e.avancar(0.1); await ch("POST", "/v1/worker/cutucar"); // 6 s depois: dentro dos 15 s, não cutuca de novo
+  igual(cutucadas, 1);
+  e.avancar(0.5); await ch("POST", "/v1/worker/cutucar");
+  const fim = (await ch("GET", `/v1/posts/${post.id}`)).post;
+  igual([fim.estado, e.ig.publicadas.length], ["published", 1]);
+});
+
 rodar("worker: publicação, reconciliação, falhas, concorrência e atraso");

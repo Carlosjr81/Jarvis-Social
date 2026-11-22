@@ -20,7 +20,7 @@ export function espera(tentativa, { esperarSeg, aleatorio = Math.random } = {}) 
   return Math.round(base * (0.8 + 0.4 * aleatorio()));
 }
 
-export function criarWorker({ banco, armazenamento, instagram, agora = () => new Date().toISOString(), segredos = {}, dono = "worker", aleatorio = Math.random, registrar: log = () => {} }) {
+export function criarWorker({ banco, armazenamento, instagram, agora = () => new Date().toISOString(), segredos = {}, dono = "worker", aleatorio = Math.random, registrar: log = () => {}, esperaStatusSeg = ESPERA_STATUS_SEG }) {
   const acesso = criarAcesso({ banco, agora, segredos });
   const mais = (seg) => new Date(Date.parse(agora()) + seg * 1000).toISOString();
 
@@ -124,7 +124,7 @@ export function criarWorker({ banco, armazenamento, instagram, agora = () => new
         const { containerId } = await instagram.criarContainerReel({ igUserId, token, videoUrl, legenda: post.legenda, capaUrl });
         post = await mover(post, "processing", `contêiner ${containerId} criado`, { container_id: containerId, container_criado_em: agora(), conta_id: conexao.id, ...(instagram.simulado ? { simulado: true } : {}) });
         if (!post) { await fimJob(job, "obsoleto"); return "obsoleto"; }
-        await adiar(job, ESPERA_STATUS_SEG);
+        await adiar(job, esperaStatusSeg);
         return "processing";
       }
 
@@ -137,7 +137,7 @@ export function criarWorker({ banco, armazenamento, instagram, agora = () => new
             return falhaOuNovaTentativa(job, post, new ErroRede("transitorio", `O Instagram não terminou de processar em ${LIMITE_PROCESSAMENTO_MIN} min.`));
           }
           if (post.estado === "retry_wait") post = await mover(post, "processing", "retomando acompanhamento");
-          await adiar(job, ESPERA_STATUS_SEG);
+          await adiar(job, esperaStatusSeg);
           return "processing";
         }
         if (code === "ERROR" || code === "EXPIRED") return falhaOuNovaTentativa(job, post, new ErroRede("transitorio", `O Instagram recusou o processamento do vídeo (${code}${st.status ? ": " + st.status : ""}).`));
@@ -164,7 +164,7 @@ export function criarWorker({ banco, armazenamento, instagram, agora = () => new
           }
           return concluir(job, post, mediaId, token, publicadasNestaRodada);
         }
-        await adiar(job, ESPERA_STATUS_SEG);
+        await adiar(job, esperaStatusSeg);
         return "processing";
       }
 

@@ -14,7 +14,7 @@ import { formatarLocal, partesLocais, somarDias, NOMES_DIA_LONGO, FUSO_PADRAO } 
 import { AJUDA } from "./supabase/functions/_compartilhado/comandos.js";
 import { sugerirEmail, PRAZOS_ACESSO, NOMES_SITUACAO } from "./supabase/functions/_compartilhado/acesso.js";
 
-export const VERSAO_PAINEL = "2026-11-22b";
+export const VERSAO_PAINEL = "2026-11-22c";
 const CH = { sessao: "jarvis-social:sessao", demo: "jarvis-social:demo", modo: "jarvis-social:modo", rascunho: "jarvis-social:rascunho", email: "jarvis-social:email" };
 const ls = {
   ler(k, padrao = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch { return padrao; } },
@@ -36,7 +36,10 @@ function clienteDemonstracao() {
   const arm = new ArmazenamentoMemoria();
   for (const m of banco._tab("midias")) arm.receber(m.caminho, m.tamanho, m.mime);
   const ig = criarInstagramSimulado();
-  const api = criarApi({ banco, armazenamento: arm, instagram: ig, modo: "demonstracao", segredos: { urlPainel: location.href.split("#")[0], emailsDono: ["demonstracao@local"] } });
+  // Na demonstração o worker roda aqui mesmo, com esperas curtas (2 s) para o teste imediato andar rápido.
+  const rodarWorkerLocal = () => criarWorker({ banco, armazenamento: arm, instagram: ig, dono: "demo-" + Date.now(), segredos: { emailsDono: ["demonstracao@local"] }, esperaStatusSeg: 2 }).rodar();
+  const api = criarApi({ banco, armazenamento: arm, instagram: ig, modo: "demonstracao", segredos: { urlPainel: location.href.split("#")[0], emailsDono: ["demonstracao@local"] },
+    cutucarWorker: async () => { const r = await rodarWorkerLocal(); return { reivindicados: r.reivindicados, resultados: r.resultados.map((x) => x.resultado) }; } });
   // Na demonstração você é o dono: dá para ver o painel de usuários e simular cadastros.
   const usuario = { id: "demo", email: "demonstracao@local", email_confirmado: true, nome: "Carlos Jr." };
   return {
@@ -383,6 +386,7 @@ telas.inicio = async (el) => {
     ${contaEstado && contaEstado.plano.tipo === "teste" ? `<a class="faixa" href="#planos" style="display:block">Período de teste ${esc(contaEstado.plano.texto.replace("Em teste", "").trim())}. Ver planos ▶</a>` : ""}
     ${eu.alertas.map((a) => `<div class="faixa ${a.tipo === "pausa" ? "" : "erro"}">${esc(a.texto)} ${a.post_id ? `<a href="#post/${esc(a.post_id)}">ver</a>` : a.acao === "ajustes" ? `<a href="#ajustes">resolver</a>` : a.acao === "retomar" ? `<button data-fila="retomar">Retomar</button>` : ""}</div>`).join("")}
     <a class="botao primario grande" href="#criar" style="display:flex;align-items:center;justify-content:center;text-decoration:none">＋ Novo Reel</a>
+    <button class="grande" id="teste-imediato" style="margin-top:8px">🧪 Teste de publicação imediato</button>
     <div class="cartao"><form id="f-cmd"><label for="cmd">Diga o que fazer</label>
       <input id="cmd" placeholder="Ex.: Mostre minha agenda da semana" autocomplete="off" enterkeyhint="send">
       <button class="primario" style="margin-top:8px;width:100%">Enviar</button></form>
@@ -391,6 +395,7 @@ telas.inicio = async (el) => {
     <h2>Próximos 7 dias</h2>
     ${proximos.length ? proximos.map((p) => cartaoPost(p)).join("") : `<p class="fraco">Nada programado. Toque em Novo Reel.</p>`}`;
   el.querySelectorAll("[data-fila]").forEach((b) => (b.onclick = async () => { await cli.chamar("POST", "/v1/fila/retomar"); await iniciar(); }));
+  $("#teste-imediato").onclick = abrirTestePublicacao;
   $("#f-cmd").onsubmit = (e) => { e.preventDefault(); executarComando($("#cmd").value, {}); };
 };
 
@@ -666,6 +671,89 @@ telas.ajustes = async (el) => {
   $("#ir-demo") && ($("#ir-demo").onclick = () => { ls.gravar(CH.modo, "demonstracao"); location.reload(); });
   $("#sair") && ($("#sair").onclick = () => { cli.sair(); location.hash = "#inicio"; location.reload(); });
 };
+
+// ------------------------------------------------------------------ teste de publicação imediato
+// Um botão: baixa o Reel e a capa de teste (pasta teste/), envia, cria a
+// publicação para AGORA, acorda o worker e acompanha cada etapa até o
+// permalink. Na demonstração tudo é simulado e dito como tal.
+function legendaTeste() {
+  return `🧪 Teste de publicação — Jarvis Mídia Social
+
+Este Reel foi publicado automaticamente pelo Jarvis Social para conferir a integração oficial com o Instagram: envio da mídia, criação do contêiner, processamento e publicação.
+
+Teste feito em ${formatarLocal(new Date().toISOString(), fuso())}.
+Pode ser ignorado ou apagado.
+
+#teste #jarvissocial`;
+}
+const ETAPAS_TESTE = [["midia", "Baixar o vídeo e a capa de teste"], ["video", "Enviar o vídeo ao armazenamento"], ["capa", "Enviar a capa"], ["post", "Criar a publicação para agora"], ["worker", "Acordar o servidor"], ["rede", "Instagram: contêiner, processamento e publicação"]];
+function abrirTestePublicacao() {
+  const demo = cli.modo === "demonstracao";
+  const cs = contasUsaveis();
+  abrirFolha(`<h2>Teste de publicação imediato</h2>
+    <div class="previa" style="max-width:180px"><img alt="Capa do teste" src="teste/capa-teste.jpg"></div>
+    <p class="fraco">Reel de 6 s com a capa "Teste de publicação — Jarvis Mídia Social" e esta legenda:</p>
+    <pre class="resposta cartao" style="font-size:14px">${esc(legendaTeste())}</pre>
+    ${seletorConta("tp-conta")}
+    <div class="faixa ${demo ? "demo" : "erro"}">${demo ? "DEMONSTRAÇÃO: todas as etapas são simuladas neste aparelho; nada vai ao Instagram." : "Isto publica DE VERDADE agora, no perfil escolhido. O Reel fica no perfil; apague pelo Instagram depois, se quiser."}</div>
+    <div id="tp-etapas"></div><div id="tp-fim"></div>
+    <button class="primario grande" id="tp-ir" ${cs.length ? "" : "disabled"}>${demo ? "Rodar o teste agora" : "Publicar o teste agora"}</button>
+    <button class="grande" id="tp-fechar" style="margin-top:8px">Fechar</button>`);
+  $("#tp-fechar").onclick = () => { fecharFolha(); mostrar(); };
+  $("#tp-ir") && ($("#tp-ir").onclick = () => rodarTestePublicacao($("#tp-conta") && $("#tp-conta").value));
+}
+async function rodarTestePublicacao(contaId) {
+  const demo = cli.modo === "demonstracao";
+  const conta = contasUsaveis().find((c) => c.id === contaId);
+  if (!demo && conta && !conta.simulado && !confirm(`Publicar o Reel de teste agora em @${conta.usuario_rede}?`)) return;
+  $("#tp-ir").disabled = true; $("#tp-conta") && ($("#tp-conta").disabled = true);
+  const st = Object.fromEntries(ETAPAS_TESTE.map(([k]) => [k, "esperando"]));
+  const detalhe = {};
+  const desenhar = () => { $("#tp-etapas").innerHTML = `<div class="cartao">${ETAPAS_TESTE.map(([k, n]) => `<p>${{ esperando: "○", andando: "⏳", ok: "✅", erro: "❌" }[st[k]]} ${esc(n)}${detalhe[k] ? `<br><small class="fraco">${esc(detalhe[k])}</small>` : ""}</p>`).join("")}</div>`; };
+  const etapa = (k, s, d) => { st[k] = s; if (d !== undefined) detalhe[k] = d; desenhar(); };
+  desenhar();
+  let atual = "midia";
+  try {
+    etapa("midia", "andando");
+    const baixar = async (url, nome, tipo) => { const r = await fetch(url, { cache: "no-store" }); if (!r.ok) throw new Error(`Não baixou ${url} (${r.status}).`); return new File([await r.blob()], nome, { type: tipo }); };
+    const [video, capa] = await Promise.all([baixar("teste/video-teste.mp4", "teste-jarvis.mp4", "video/mp4"), baixar("teste/capa-teste.jpg", "capa-teste-jarvis.jpg", "image/jpeg")]);
+    etapa("midia", "ok", `${(video.size / 1048576).toFixed(1)} MB + ${Math.round(capa.size / 1024)} KB`);
+    atual = "video"; etapa("video", "andando");
+    const progresso = (k) => ({ style: { set width(x) { etapa(k, "andando", "enviado " + x); } } });
+    const v = await enviarMidia("video", video, progresso("video"));
+    etapa("video", "ok", v.id.slice(0, 8));
+    atual = "capa"; etapa("capa", "andando");
+    const c = await enviarMidia("capa", capa, progresso("capa"));
+    etapa("capa", "ok");
+    atual = "post"; etapa("post", "andando");
+    const { post } = await cli.chamar("POST", "/v1/posts", { video_id: v.id, capa_id: c.id, conta_id: contaId || undefined, legenda: legendaTeste(), publicar_agora: true, teste: true, chave_idempotencia: "teste-" + novaChave() });
+    etapa("post", "ok", `${post.recibo.perfil || "sem conta"} · ${post.estado_texto}`);
+    atual = "worker"; etapa("worker", "andando");
+    const cut = await cli.chamar("POST", "/v1/worker/cutucar");
+    etapa("worker", "ok", cut.cutucado ? "servidor acordado" : cut.motivo);
+    atual = "rede"; etapa("rede", "andando", "aguardando o servidor…");
+    const inicio = Date.now(); let ultimoCut = Date.now(); let p = post;
+    while (Date.now() - inicio < 8 * 60e3) {
+      await new Promise((r) => setTimeout(r, demo ? 1500 : 5000));
+      if (demo || Date.now() - ultimoCut > 16000) { ultimoCut = Date.now(); try { await cli.chamar("POST", "/v1/worker/cutucar"); } catch {} }
+      p = (await cli.chamar("GET", `/v1/posts/${post.id}`)).post;
+      etapa("rede", "andando", `${p.estado_texto}${p.container_id ? " · contêiner " + p.container_id : ""}${p.ultimo_erro ? " · " + p.ultimo_erro : ""} · ${Math.round((Date.now() - inicio) / 1000)} s`);
+      if (["published", "failed", "cancelled", "paused"].includes(p.estado)) break;
+    }
+    const rc = p.recibo;
+    if (p.estado === "published") {
+      etapa("rede", "ok", `mídia ${rc.media_id}`);
+      $("#tp-fim").innerHTML = `<div class="faixa ${rc.confirmacao === "publicacao_concluida" ? "ok" : "demo"}"><strong>${esc(confirmacaoTexto(rc))}</strong>${rc.permalink ? `<br><a href="${esc(rc.permalink)}" target="_blank" rel="noopener">${rc.confirmacao === "demonstracao" ? "Link simulado (não abre)" : "Abrir no Instagram"}</a>` : ""}<br><a href="#post/${esc(p.id)}">Ver recibo completo</a></div>`;
+    } else {
+      etapa("rede", ["failed", "cancelled", "paused"].includes(p.estado) ? "erro" : "andando", `${p.estado_texto}${p.ultimo_erro ? ": " + p.ultimo_erro : ""}`);
+      $("#tp-fim").innerHTML = `<div class="faixa erro">${p.estado === "failed" ? "O teste falhou. Motivo acima." : "Ainda não terminou em 8 min; o servidor continua sozinho."} <a href="#post/${esc(p.id)}">Acompanhar no recibo</a></div>`;
+    }
+  } catch (err) {
+    etapa(atual, "erro", err.message);
+    $("#tp-fim").innerHTML = `<div class="faixa erro">${mensagemErro(err)}</div>`;
+  }
+  $("#tp-ir").textContent = "Rodar outro teste"; $("#tp-ir").disabled = false; $("#tp-ir").onclick = abrirTestePublicacao;
+}
 
 // ------------------------------------------------------------------ painel de usuários (só o dono)
 const FILTROS_CONTA = [["todos", "Todas"], ["aguardando", "Aguardando"], ["liberados", "Liberados"], ["online", "Online"], ["sumidos", "Sumidos"], ["prazo", "Prazo"], ["bloqueados", "Bloqueados"], ["pagar", "Precisa pagar"], ["pagantes", "Pagantes"], ["cortesia", "Cortesia"], ["automaticos", "Automáticos"]];
