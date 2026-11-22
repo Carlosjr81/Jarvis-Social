@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  actions: write   # para disparar a instalação sozinho quando o token aparecer
 
 jobs:
   bater:
@@ -20,6 +21,23 @@ jobs:
       TOKEN: ${{ secrets.JS_SUPABASE_ACCESS_TOKEN }}
       REF_FIXO: ${{ secrets.JS_SUPABASE_PROJECT_REF }}
     steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: config.js
+          sparse-checkout-cone-mode: false
+      # O dono só cola o token no GitHub; a instalação começa sozinha aqui.
+      - name: Instalar o servidor se o token chegou e o painel ainda não aponta para ele
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$TOKEN" ]; then echo "Sem token do Supabase ainda."; exit 0; fi
+          if grep -Eq 'supabaseUrl: *"https://' config.js; then echo "Servidor já instalado."; exit 0; fi
+          ANDAMENTO=$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$REPO/actions/workflows/jarvis-social.yml/runs?per_page=5" | jq '[.workflow_runs[] | select(.status != "completed")] | length')
+          if [ "$ANDAMENTO" != "0" ]; then echo "Instalação já em andamento."; exit 0; fi
+          curl -fsS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/actions/workflows/jarvis-social.yml/dispatches" -d '{"ref":"main","inputs":{"implantar":true}}'
+          echo "Token encontrado: instalação do servidor disparada."
       - name: Chamar o worker
         run: |
           if [ -z "$TOKEN" ]; then echo "Servidor ainda não configurado."; exit 0; fi

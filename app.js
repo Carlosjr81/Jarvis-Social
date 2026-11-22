@@ -14,7 +14,7 @@ import { formatarLocal, partesLocais, somarDias, NOMES_DIA_LONGO, FUSO_PADRAO } 
 import { AJUDA } from "./supabase/functions/_compartilhado/comandos.js";
 import { sugerirEmail, PRAZOS_ACESSO, NOMES_SITUACAO } from "./supabase/functions/_compartilhado/acesso.js";
 
-export const VERSAO_PAINEL = "2026-11-22j";
+export const VERSAO_PAINEL = "2026-11-22k";
 const CH = { sessao: "jarvis-social:sessao", demo: "jarvis-social:demo", modo: "jarvis-social:modo", rascunho: "jarvis-social:rascunho", email: "jarvis-social:email" };
 const ls = {
   ler(k, padrao = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch { return padrao; } },
@@ -914,6 +914,19 @@ document.addEventListener("click", async (e) => {
   } catch (err) { alert(err.message); }
 });
 
+// "Servidor no ar": o único passo que só o dono pode fazer (token é dele e não
+// passa pela conversa). Três toques; depois a instalação começa sozinha
+// (relogio.yml confere a cada 15 min e dispara o jarvis-social.yml).
+const REPO_GH = "https://github.com/Carlosjr81/Jarvis-Social";
+const LIGAR_SERVIDOR = `<small class="fraco">3 toques, uma vez só. Depois tudo se instala sozinho em até 15 min.</small>
+  <span class="linha" style="margin-top:6px;flex-wrap:wrap">
+    <a class="botao" href="https://supabase.com/dashboard/account/tokens" target="_blank" rel="noopener">1. Gerar token no Supabase</a>
+    <button data-copiar="JS_SUPABASE_ACCESS_TOKEN">2. Copiar o nome do segredo</button>
+    <a class="botao" href="${REPO_GH}/settings/secrets/actions/new" target="_blank" rel="noopener">3. Colar no GitHub</a>
+    <a class="botao" href="${REPO_GH}/actions/workflows/jarvis-social.yml" target="_blank" rel="noopener">Ver a instalação</a>
+  </span><small class="fraco">No passo 3: Name = o que você copiou no 2; Secret = o token do 1. O token nunca passa pelo chat.</small>`;
+document.addEventListener("click", (e) => { if (e.target.closest("#ir-servidor-cfg")) { ls.apagar(CH.modo); location.reload(); } });
+
 // Lista de configuração (dono/admin): o que falta para tudo funcionar sozinho.
 async function cartaoConfiguracao() {
   if (!contaEstado || !["dono", "admin"].includes(eu.papel)) return "";
@@ -922,7 +935,7 @@ async function cartaoConfiguracao() {
   // [feito?, nome, botão de UM toque ou instrução curta]
   const botao = (attr, texto) => `<button ${attr} style="margin-top:6px">${texto}</button>`;
   const itens = [
-    [cli.modo === "servidor", "Servidor no ar", `<small class="fraco">Um token do Supabase no GitHub (docs/DEPLOY.md, passo 1); o resto é automático.</small>`],
+    [cli.modo === "servidor", "Servidor no ar", servidorConfigurado ? botao('id="ir-servidor-cfg"', "Usar o servidor") : LIGAR_SERVIDOR],
     [!!eu.instagram_configurado, "App da Meta configurado", contaEstado.dono ? botao('data-acao-config="meta"', "Configurar agora") : `<small class="fraco">Feito pelo administrador.</small>`],
     [eu.conexoes.some((c) => c.estado === "ativa"), "Instagram conectado", eu.instagram_configurado ? botao('data-acao-config="instagram"', "Conectar o Instagram") : `<small class="fraco">Depois do app da Meta.</small>`],
     [!!eu.org.piloto_automatico, "Piloto automático", botao('data-acao-config="piloto"', "Ligar")],

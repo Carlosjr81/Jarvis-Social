@@ -17,9 +17,14 @@ no painel e no contrato do GPT.
    (nome `jarvis-social`) › copie.
 3. Abra https://github.com/Carlosjr81/Jarvis-Social/settings/secrets/actions ›
    **New repository secret** › nome `JS_SUPABASE_ACCESS_TOKEN` › cole › Add.
-4. Diga ao Claude **"continue"** (ou: Actions › Jarvis Social › Run workflow).
+4. Pronto: não precisa disparar nada. O relógio (`relogio.yml`, a cada 15 min)
+   vê o token, confere que o `config.js` ainda está vazio e dispara a
+   instalação sozinho. Com pressa: Actions › Jarvis Social › Run workflow.
 
-Em ~5 minutos o painel deixa a demonstração e mostra **Criar conta**.
+Os mesmos atalhos estão no painel (Início › Configuração › "Servidor no ar":
+**1. Gerar token** · **2. Copiar o nome do segredo** · **3. Colar no GitHub**).
+
+Em até ~20 minutos o painel deixa a demonstração e mostra **Criar conta**.
 
 ## Passo 2 — sua conta de dono (1 min)
 No painel: **Criar conta** com o seu e-mail › confirme pelo link do e-mail ›

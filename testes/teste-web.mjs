@@ -123,6 +123,12 @@ if (pw) {
       await pg.locator("[data-filtro=publicados]").click();
       await pg.getByText("Publicação simulada (sem link real)").first().waitFor();
       igual(await pg.getByText("Ver no Instagram").count(), 0, "post simulado nunca ganha link de Instagram");
+      // "Servidor no ar" sem servidor: os 3 atalhos do único passo manual
+      await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
+      await pg.getByText(/Configuração: \d de 6/).first().waitFor();
+      igual(await pg.getByRole("link", { name: "1. Gerar token no Supabase" }).getAttribute("href"), "https://supabase.com/dashboard/account/tokens");
+      igual(await pg.getByRole("button", { name: "2. Copiar o nome do segredo" }).getAttribute("data-copiar"), "JS_SUPABASE_ACCESS_TOKEN");
+      verdade((await pg.getByRole("link", { name: "3. Colar no GitHub" }).getAttribute("href")).endsWith("/settings/secrets/actions/new"));
       // Grade e chave de integração pelo painel
       await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#agenda`);
       await pg.click("#ver-grade"); await pg.getByRole("heading", { name: "Grade dos próximos 14 dias" }).waitFor();
