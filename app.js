@@ -14,7 +14,7 @@ import { formatarLocal, partesLocais, somarDias, NOMES_DIA_LONGO, FUSO_PADRAO } 
 import { AJUDA } from "./supabase/functions/_compartilhado/comandos.js";
 import { sugerirEmail, PRAZOS_ACESSO, NOMES_SITUACAO } from "./supabase/functions/_compartilhado/acesso.js";
 
-export const VERSAO_PAINEL = "2026-11-22l";
+export const VERSAO_PAINEL = "2026-11-22m";
 const CH = { sessao: "jarvis-social:sessao", demo: "jarvis-social:demo", modo: "jarvis-social:modo", rascunho: "jarvis-social:rascunho", email: "jarvis-social:email" };
 const ls = {
   ler(k, padrao = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch { return padrao; } },
@@ -83,6 +83,10 @@ function clienteServidor() {
     async entrar(email, senha) { guardar(await auth("token?grant_type=password", { email, password: senha })); },
     async cadastrar(email, senha, nome) { const j = await auth("signup", { email, password: senha, data: { nome } }); if (j.access_token) guardar(j); return j; },
     async esqueci(email) { await auth("recover", { email }); },
+    // Confirmação por CÓDIGO (não por link): o link do e-mail abria outro app
+    // instalado no mesmo endereço (carlosjr81.github.io). O código é digitado aqui.
+    async confirmarCodigo(email, codigo) { guardar(await auth("verify", { type: "signup", email, token: codigo })); },
+    async reenviarCodigo(email) { await auth("resend", { type: "signup", email }); },
     async chamar(metodo, caminho, corpo, consulta) {
       const t = await token();
       const q = consulta ? "?" + new URLSearchParams(Object.entries(consulta).filter(([, v]) => v != null)).toString() : "";
@@ -273,17 +277,33 @@ telas.entrar = async (el, modoTela = ls.ler(CH.email) ? "entrar" : "criar") => {
       if (criar) {
         const nome = $("#nome").value.trim(); if (!nome) return msgEm("#msg", "Diga o seu nome.");
         const j = await cli.cadastrar(email, senha, nome);
-        if (!j.access_token) return msgEm("#msg", `Pronto, ${nome}! Confirme o cadastro pelo link enviado para ${email} e depois toque em Entrar.`, "ok");
+        if (!j.access_token) return pedirCodigo(email, senha);
       } else await cli.entrar(email, senha);
       await iniciar();
     } catch (err) {
       const m = String(err.message || "");
       if (criar && /registered|already/i.test(m)) { telas.entrar(el, "entrar"); return msgEm("#msg", "Este e-mail já tem conta. Entre com a senha."); }
-      if (/confirm/i.test(m)) return msgEm("#msg", "Confirme o e-mail pelo link que enviamos e tente de novo.");
+      if (/confirm/i.test(m)) return pedirCodigo(email, senha, true);
       msgEm("#msg", /invalid/i.test(m) ? "E-mail ou senha não conferem." : m);
     }
   };
   $("#b-demo").onclick = () => { ls.gravar(CH.modo, "demonstracao"); location.reload(); };
+  // Código do e-mail: digita aqui mesmo. Se o link do e-mail já confirmou, "Entrar" resolve.
+  function pedirCodigo(email, senha, jaTinha = false) {
+    $("#msg").innerHTML = `<div class="faixa ok">${jaTinha ? "Falta confirmar o e-mail." : "Conta criada!"} Digite o código que chegou em <strong>${esc(email)}</strong> (veja também o spam).</div>
+      <label for="codigo">Código do e-mail</label><input id="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="10" style="font-size:1.4em;letter-spacing:.2em">
+      <button type="button" class="primario grande" id="b-codigo" style="margin-top:8px;width:100%">Confirmar</button>
+      <div class="linha" style="margin-top:8px"><button type="button" id="b-reenviar">Reenviar código</button><button type="button" id="b-ja">Já confirmei pelo link › Entrar</button></div><div id="msg-codigo"></div>`;
+    $("#codigo").focus();
+    $("#b-codigo").onclick = async () => {
+      const c = $("#codigo").value.replace(/\D/g, "");
+      if (c.length < 6) return msgEm("#msg-codigo", "O código tem 6 números ou mais.");
+      try { await cli.confirmarCodigo(email, c); await iniciar(); }
+      catch (err) { msgEm("#msg-codigo", /expired|invalid/i.test(err.message) ? "Código vencido ou errado. Toque em Reenviar código." : err.message); }
+    };
+    $("#b-reenviar").onclick = async () => { try { await cli.reenviarCodigo(email); msgEm("#msg-codigo", "Código novo enviado.", "ok"); } catch (err) { msgEm("#msg-codigo", /seconds|rate/i.test(err.message) ? "Espere 1 minuto e tente de novo." : err.message); } };
+    $("#b-ja").onclick = async () => { try { await cli.entrar(email, senha); await iniciar(); } catch (err) { msgEm("#msg-codigo", /confirm/i.test(err.message) ? "Ainda não confirmado: use o código." : err.message); } };
+  }
 };
 
 function telaSair() { return `<button id="sair-porteiro" style="width:100%;margin-top:12px">Sair</button>`; }

@@ -129,6 +129,13 @@ jobs:
           curl -fsS -X POST "$API/projects/$REF/database/query" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" --data @/tmp/q.json > /dev/null
           jq -n --arg s "$PAINEL" '{site_url:$s, uri_allow_list:$s}' > /tmp/a.json
           curl -fsS -X PATCH "$API/projects/$REF/config/auth" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" --data @/tmp/a.json > /dev/null
+          # E-mails em português; cadastro confirmado por CÓDIGO digitado no painel
+          # (o link abria outro app instalado no mesmo domínio github.io).
+          jq -n --rawfile c supabase/emails/confirmacao.html --rawfile r supabase/emails/nova-senha.html \
+            '{mailer_subjects_confirmation:"Seu código do Jarvis Social", mailer_templates_confirmation_content:$c,
+              mailer_subjects_recovery:"Jarvis Social: criar senha nova", mailer_templates_recovery_content:$r}' > /tmp/e.json
+          curl -fsS -X PATCH "$API/projects/$REF/config/auth" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" --data @/tmp/e.json > /dev/null \
+            || echo "::warning::Não consegui trocar os modelos de e-mail (o cadastro ainda funciona pelo link)."
       - name: Prova de vida (saúde da API, worker e conector)
         if: steps.seg.outputs.ok == '1'
         run: |

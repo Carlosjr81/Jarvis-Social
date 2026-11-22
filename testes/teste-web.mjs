@@ -10,6 +10,10 @@ import { fileURLToPath } from "node:url";
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const req = createRequire(import.meta.url);
 
+// O config.js publicado aponta para o servidor real; os testes do painel rodam
+// na DEMONSTRAÇÃO (config vazio), sem tocar no servidor.
+const demo = (ctx) => ctx.route("**/config.js", (r) => r.fulfill({ contentType: "text/javascript", body: 'export const CONFIG = { supabaseUrl: "", supabaseAnon: "" };' }));
+
 teste("app.js e sw.js sem erro de sintaxe", () => { execFileSync(process.execPath, ["--check", path.join(RAIZ, "app.js")]); execFileSync(process.execPath, ["--check", path.join(RAIZ, "sw.js")]); });
 teste("config.js não traz segredo (só URL e chave anon)", () => {
   const c = fs.readFileSync(path.join(RAIZ, "config.js"), "utf8");
@@ -57,7 +61,7 @@ if (pw) {
     const srv = await servir(); const porta = srv.address().port;
     const nav = await pw.chromium.launch();
     try {
-      const ctx = await nav.newContext({ viewport: { width: 360, height: 740 }, locale: "pt-BR", timezoneId: "Asia/Tokyo" });
+      const ctx = await nav.newContext({ viewport: { width: 360, height: 740 }, locale: "pt-BR", timezoneId: "Asia/Tokyo" }); await demo(ctx);
       // A abertura aparece uma vez por sessão; o fluxo principal começa sem ela (ela tem teste próprio).
       await ctx.addInitScript(() => { try { sessionStorage.setItem("jarvis-social:abertura", "1"); } catch {} });
       const pg = await ctx.newPage();
@@ -174,7 +178,7 @@ if (pw) {
     const srv = await servir(); const porta = srv.address().port;
     const nav = await pw.chromium.launch();
     try {
-      const pg = await (await nav.newContext({ viewport: { width: 360, height: 740 } })).newPage();
+      const c1 = await nav.newContext({ viewport: { width: 360, height: 740 } }); await demo(c1); const pg = await c1.newPage();
       // O Chromium do Actions não toca H.264: segura o vídeo "carregando" para testar o Pular em qualquer navegador.
       await pg.route("**/abertura-v2.mp4", () => {});
       await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
@@ -185,7 +189,7 @@ if (pw) {
       await pg.reload(); await pg.getByText("Novo Reel").first().waitFor();
       igual(await pg.locator("#abertura").count(), 0, "não repete na mesma sessão");
       // vídeo ausente (ou formato sem suporte): a abertura não pode trancar a entrada
-      const pg2 = await (await nav.newContext({ viewport: { width: 360, height: 740 } })).newPage();
+      const c2 = await nav.newContext({ viewport: { width: 360, height: 740 } }); await demo(c2); const pg2 = await c2.newPage();
       await pg2.route("**/abertura-v2.mp4", (r) => r.fulfill({ status: 404, body: "" }));
       await pg2.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
       await pg2.getByText("Novo Reel").first().waitFor({ timeout: 8000 });
