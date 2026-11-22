@@ -12,6 +12,11 @@ const HORA = { type: "string", description: "Hora local HH:MM" };
 const ID = { type: "string", description: "id da publicação (post_id)" };
 
 export const FERRAMENTAS = [
+  { name: "agendar_reel", description: "Programa um Reel em UM passo, como no Metricool: link do vídeo (Google Drive com acesso 'qualquer pessoa com o link', Dropbox ou link direto de MP4/MOV) ou video_id da biblioteca, capa opcional, legenda e quando (data+hora locais, proximo_livre na grade, ou publicar_agora). O servidor baixa, confere e devolve o recibo. Repetir o mesmo pedido não duplica. Confirme com o dono antes de publicar_agora.",
+    inputSchema: S({ video_url: { type: "string", description: "link https do vídeo" }, video_id: { type: "string" }, capa_url: { type: "string" }, capa_id: { type: "string" }, legenda: { type: "string", maxLength: 2200 }, data: DATA, hora: HORA, proximo_livre: { type: "boolean" }, publicar_agora: { type: "boolean" }, conta_id: { type: "string", description: "conta do Instagram (padrão do espaço se vazio)" }, rascunho: { type: "boolean", description: "só guardar como rascunho" } }, ["legenda"]),
+    chamar: (a) => ["POST", "/v1/reels", a] },
+  { name: "importar_video", description: "Baixa um vídeo (ou capa, tipo='capa') de um link https para a biblioteca, sem programar. Devolve o id.", inputSchema: S({ url: { type: "string" }, tipo: { type: "string", enum: ["video", "capa"] }, nome: { type: "string" } }, ["url"]),
+    chamar: (a) => ["POST", "/v1/midias/importar", a] },
   { name: "ver_grade", description: "Mostra a grade de publicação futura: cada horário da frequência configurada nos próximos dias, livre ou ocupado (e por qual post), mais os posts fora da grade e quantos rascunhos esperam horário. Use primeiro para saber o que está programado.", inputSchema: S({ dias: { type: "integer", minimum: 1, maximum: 60, description: "quantos dias à frente (padrão 14)" } }),
     chamar: (a) => ["GET", "/v1/grade", null, { dias: a.dias || 14 }] },
   { name: "ver_agenda", description: "Lista as publicações (Reels) entre duas datas, com estado, horário local, conta e recibo.", inputSchema: S({ de: DATA, ate: DATA }),
@@ -44,7 +49,7 @@ export const FERRAMENTAS = [
 ];
 
 export const INSTRUCOES = `Você gerencia a grade de Reels do Instagram do dono pelo Jarvis Social.
-Regras: comece por ver_grade; use datas no fuso do espaço (America/Sao_Paulo); antes de mudar a frequência, mostre previa_frequencia e só aplique com o OK do dono; antes de cancelar, confirme. Diga sempre o estado exato: "agendado no Jarvis" não é "publicado"; publicado só com permalink. Vídeos novos entram pelo painel (Novo Reel ou Biblioteca); você programa o que já está lá.`;
+Regras: comece por ver_grade; use datas no fuso do espaço (America/Sao_Paulo); antes de mudar a frequência, mostre previa_frequencia e só aplique com o OK do dono; antes de cancelar, confirme. Diga sempre o estado exato: "agendado no Jarvis" não é "publicado"; publicado só com permalink. Para programar um Reel novo use agendar_reel com o link do vídeo (Drive "qualquer pessoa com o link", Dropbox ou MP4 direto); arquivo anexado na conversa não é um link: peça ao dono para subir no Drive ou no painel. Confirme antes de publicar_agora.`;
 
 export function criarMcp({ api }) {
   const ok = (id, result) => ({ jsonrpc: "2.0", id, result });

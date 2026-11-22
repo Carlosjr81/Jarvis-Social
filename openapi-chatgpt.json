@@ -681,6 +681,117 @@
      }
     }
    }
+  },
+  "/v1/reels": {
+   "post": {
+    "operationId": "agendarReel",
+    "summary": "Programar um Reel em um passo",
+    "description": "Link do vídeo (Drive 'qualquer pessoa com o link', Dropbox ou MP4 direto) ou video_id, legenda e quando (data+hora, proximo_livre ou publicar_agora). Repetir não duplica. Confirme antes de publicar_agora.",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "legenda"
+        ],
+        "properties": {
+         "video_url": {
+          "type": "string"
+         },
+         "video_id": {
+          "type": "string"
+         },
+         "capa_url": {
+          "type": "string"
+         },
+         "capa_id": {
+          "type": "string"
+         },
+         "legenda": {
+          "type": "string"
+         },
+         "data": {
+          "type": "string"
+         },
+         "hora": {
+          "type": "string"
+         },
+         "proximo_livre": {
+          "type": "boolean"
+         },
+         "publicar_agora": {
+          "type": "boolean"
+         },
+         "conta_id": {
+          "type": "string"
+         },
+         "rascunho": {
+          "type": "boolean"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "recibo",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/midias/importar": {
+   "post": {
+    "operationId": "importarVideo",
+    "summary": "Importar vídeo/capa por link",
+    "description": "Baixa para a biblioteca sem programar.",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "url"
+        ],
+        "properties": {
+         "url": {
+          "type": "string"
+         },
+         "tipo": {
+          "type": "string",
+          "enum": [
+           "video",
+           "capa"
+          ]
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "ok",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  }
 }

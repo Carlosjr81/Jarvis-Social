@@ -19,3 +19,6 @@ alter table tokens_api enable row level security;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then revoke all on tokens_api from anon, authenticated; end if;
 end $$;
+
+-- Mídia importada por link (ChatGPT/Claude programando como no Metricool).
+alter table midias add column origem_url text;

@@ -106,4 +106,67 @@ teste("todas as ferramentas têm descrição e esquema de entrada", () => {
   for (const f of FERRAMENTAS) verdade(f.description.length > 20 && f.inputSchema.type === "object", f.name);
 });
 
+// "Internet de mentira" para a importação por link.
+import fs from "node:fs";
+const MP4 = new Uint8Array(fs.readFileSync(new URL("../teste/video-teste.mp4", import.meta.url)));
+const JPG = new Uint8Array(fs.readFileSync(new URL("../teste/capa-teste.jpg", import.meta.url)));
+const pedidos = [];
+function internet(url) {
+  pedidos.push(url);
+  const u = new URL(url);
+  const r = (status, corpo, cab = {}) => new Response(corpo, { status, headers: cab });
+  if (u.hostname === "drive.usercontent.google.com" && u.searchParams.get("id") === "VIDEO123abc") return r(200, MP4, { "content-length": String(MP4.length) });
+  if (u.hostname === "drive.usercontent.google.com" && u.searchParams.get("id") === "PRIVADO123abc") return r(200, "<!doctype html><html>Entrar no Google</html>");
+  if (u.hostname === "cdn.exemplo.com" && u.pathname === "/capa.jpg") return r(200, JPG);
+  if (u.hostname === "cdn.exemplo.com" && u.pathname === "/vai") return r(302, null, { location: "https://169.254.169.254/latest/meta-data" });
+  if (u.hostname === "cdn.exemplo.com" && u.pathname === "/grande.mp4") return r(200, MP4, { "content-length": String(500 * 1048576) });
+  return r(404, "não achei");
+}
+const buscar = async (url) => internet(url);
+
+teste("agendar_reel (como no Metricool): link do Drive + capa + legenda + horário = Reel programado", async () => {
+  const e = ambiente({ buscar }); await e.preparar(A);
+  const t = await comChave(e, A); const mcp = criarMcp({ api: e.api });
+  const call = (id, name, args) => mcp.tratar({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } }, t);
+  const args = { video_url: "https://drive.google.com/file/d/VIDEO123abc/view?usp=sharing", capa_url: "https://cdn.exemplo.com/capa.jpg", legenda: "Treino 40+ 💪", data: "2026-11-23", hora: "10:00" };
+  const r = await call(1, "agendar_reel", args);
+  verdade(!r.result.isError, r.result.content[0].text);
+  const p = r.result.structuredContent.post;
+  igual([p.estado, p.recibo.agendado_local, p.recibo.confirmacao], ["scheduled", "seg., 23/11/2026 às 10:00 (America/Sao_Paulo)", "agendamento_confirmado_no_jarvis"]);
+  verdade(pedidos.some((x) => x.startsWith("https://drive.usercontent.google.com/download?id=VIDEO123abc")), "link do Drive virou download direto");
+  const v = (await e.banco.listar("midias", { tipo: "video", origem_url: args.video_url }))[0];
+  igual([v.mime, v.tamanho, v.estado], ["video/mp4", MP4.length, "pronta"]);
+  const de_novo = await call(2, "agendar_reel", args);
+  igual([de_novo.result.structuredContent.repetido, (await e.banco.listar("posts", {})).length], [true, 1], "repetir não duplica");
+});
+
+teste("importação recusa link interno, página no lugar do arquivo, arquivo grande e http", async () => {
+  const e = ambiente({ buscar }); await e.preparar(A);
+  const t = await comChave(e, A);
+  const imp = (url) => viaChave(e, t, "POST", "/v1/midias/importar", { url });
+  igual((await imp("https://cdn.exemplo.com/vai")).corpo.erro, "link_interno", "redirecionamento para metadados da nuvem");
+  igual((await imp("https://10.0.0.5/x.mp4")).corpo.erro, "link_interno");
+  igual((await imp("https://localhost/x.mp4")).corpo.erro, "link_interno");
+  igual((await imp("http://cdn.exemplo.com/capa.jpg")).corpo.erro, "link_inseguro");
+  const priv = (await imp("https://drive.google.com/file/d/PRIVADO123abc/view")).corpo;
+  verdade(priv.erro === "nao_e_midia" && priv.mensagem.includes("qualquer pessoa com o link"), priv.mensagem);
+  igual((await imp("https://cdn.exemplo.com/grande.mp4")).status, 413);
+  igual((await imp("https://cdn.exemplo.com/capa.jpg")).corpo.erro, "formato_invalido", "imagem no lugar de vídeo");
+  const tl = await comChave(e, A, "leitura");
+  igual((await viaChave(e, tl, "POST", "/v1/reels", { video_url: "https://x.com/a.mp4", legenda: "x", proximo_livre: true })).corpo.erro, "so_leitura");
+});
+
+teste("agendar_reel no próximo horário livre e publicar agora acorda o servidor", async () => {
+  let cutucadas = 0;
+  const e = ambiente({ buscar }); await e.preparar(A);
+  const { criarApi } = await import("../supabase/functions/_compartilhado/api.js");
+  const api = criarApi({ banco: e.banco, armazenamento: e.arm, instagram: e.ig, agora: e.relogio, segredos: { emailsDono: [] }, buscar, cutucarWorker: async () => { cutucadas++; } });
+  const t = (await api.tratar({ metodo: "POST", caminho: "/v1/chaves", corpo: { nome: "GPT" }, usuario: A })).corpo.segredo;
+  const livre = (await api.tratar({ metodo: "POST", caminho: "/v1/reels", corpo: { video_url: "https://drive.google.com/file/d/VIDEO123abc/view", legenda: "a", proximo_livre: true }, token: t })).corpo.post;
+  igual(livre.recibo.agendado_local, "seg., 23/11/2026 às 10:00 (America/Sao_Paulo)");
+  const ja = (await api.tratar({ metodo: "POST", caminho: "/v1/reels", corpo: { video_url: "https://drive.google.com/file/d/VIDEO123abc/view", legenda: "b", publicar_agora: true }, token: t })).corpo.post;
+  igual([ja.agendado_utc, cutucadas], [e.rel.t, 1]);
+  igual((await e.banco.listar("midias", { tipo: "video", mime: "video/mp4", tamanho: MP4.length })).length, 1, "o mesmo vídeo não é guardado duas vezes");
+});
+
 rodar("integração: chaves, grade de publicação e conector MCP (ChatGPT e Claude)");

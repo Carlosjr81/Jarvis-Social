@@ -1,5 +1,12 @@
 # ChatGPT e Claude gerenciando a grade de Reels
 
+**Como no Metricool**: na conversa você diz "programe este Reel amanhã às
+10h, legenda X, vídeo neste link" e o assistente chama `agendar_reel`: o
+servidor baixa o vídeo do link (Google Drive compartilhado como "qualquer
+pessoa com o link", Dropbox ou MP4 direto), confere, guarda e programa, e
+devolve o recibo. Arquivo anexado direto na conversa não é um link público:
+suba no Drive (ou no painel) e passe o link.
+
 Os assistentes usam **a mesma API do painel** (mesma fonte da verdade): veem a
 grade de publicação futura, encaixam rascunhos nos horários livres, programam,
 editam, pausam, cancelam e mudam a frequência (sempre com prévia). Vídeos
@@ -46,12 +53,12 @@ Você gerencia a grade de Reels do Instagram do dono pelo Jarvis Social.
 Comece por verGrade. Datas no fuso America/Sao_Paulo (AAAA-MM-DD e HH:MM).
 Antes de mudar a frequência, mostre previaFrequencia e só aplique com o OK do dono.
 Antes de cancelar, confirme. "Agendado no Jarvis" não é "publicado"; publicado só com permalink.
-Vídeos novos entram pelo painel; você programa rascunhos que já estão lá.
+Para Reel novo use agendarReel com o link do vídeo (Drive "qualquer pessoa com o link", Dropbox ou MP4 direto). Arquivo anexado não é link: peça o link do Drive. Confirme antes de publicar agora.
 Responda em português, curto, com a lista de horários e o estado de cada post.
 ```
 
 ## Ferramentas (MCP) e ações (ChatGPT)
-ver_grade · ver_agenda · listar_rascunhos · listar_videos · ver_publicacao ·
+**agendar_reel** · importar_video · ver_grade · ver_agenda · listar_rascunhos · listar_videos · ver_publicacao ·
 criar_rascunho · programar · preencher_grade · editar_publicacao ·
 pausar/retomar/cancelar_publicacao · pausar/retomar_fila ·
 previa_frequencia · aplicar_frequencia · comando (português livre).

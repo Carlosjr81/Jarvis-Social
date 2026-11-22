@@ -24,6 +24,11 @@ export class ArmazenamentoSupabase {
     if (!r.ok) throw new Error("Storage: " + (j.message || r.status));
     return { tamanho: Number(j.size ?? (j.metadata && j.metadata.size)), mime: j.content_type || (j.metadata && j.metadata.mimetype) };
   }
+  // Grava bytes baixados pelo servidor (importação por link).
+  async enviar(caminho, bytes, mime) {
+    const r = await this.f(`${this.base}/object/${BUCKET}/${caminho}`, { method: "POST", headers: this._cab({ "Content-Type": mime, "x-upsert": "true" }), body: bytes });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error("Storage: não gravou o arquivo: " + (j.message || r.status)); }
+  }
   async urlAssinada(caminho, segundos) {
     const r = await this.f(`${this.base}/object/sign/${BUCKET}/${caminho}`, { method: "POST", headers: this._cab({ "Content-Type": "application/json" }), body: JSON.stringify({ expiresIn: segundos }) });
     const j = await r.json();
@@ -37,6 +42,7 @@ export class ArmazenamentoMemoria {
   constructor() { this.objetos = new Map(); }
   async criarUploadAssinado(caminho) { return { url: `memoria://${caminho}`, metodo: "PUT" }; }
   receber(caminho, tamanho, mime) { this.objetos.set(caminho, { tamanho, mime }); }
+  async enviar(caminho, bytes, mime) { this.receber(caminho, bytes.length, mime); }
   async info(caminho) { return this.objetos.get(caminho) || null; }
   async urlAssinada(caminho, segundos) { return `memoria://${caminho}?expira=${segundos}`; }
 }

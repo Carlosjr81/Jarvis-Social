@@ -10,7 +10,7 @@
 | Branch | `main` (código da fundação veio do commit `a8cace1` da branch `ccr-272ef392-6vuh6i` do Super-HQs) |
 | Actions | workflow *Jarvis Social* dispara sozinho a cada push (repositório público). Run 45030840705 (22/11/2026): verde, mas SQL e painel não tinham rodado no runner; corrigido para instalar PostgreSQL e Chromium e reprovar se faltarem |
 | Etapa | A concluída (fundação) + B em parte (agendamento e adaptador Meta testados com simulador) + base comercial da E (cadastro com aprovação, termos, prazos, cobrança por Pix, painel do dono), 22/11/2026 |
-| Testes | `node testes/rodar.mjs` → 101 passou / 0 falhou (22/11/2026, sessão na nuvem; Actions confere a cada push) |
+| Testes | `node testes/rodar.mjs` → 104 passou / 0 falhou (22/11/2026, sessão na nuvem; Actions confere a cada push) |
 | Painel publicado | Pages ligado pelo dono em 22/11/2026 (main, raiz): https://carlosjr81.github.io/Jarvis-Social/ — em DEMONSTRAÇÃO até o servidor existir. A sessão na nuvem não alcança github.io; abertura no celular a confirmar pelo dono |
 | Servidor (Supabase) | **Não criado.** Depende do passo 1 do dono em `docs/DEPLOY.md` |
 | Instagram real | **Não conectado / nenhuma publicação real feita.** Depende do app da Meta (passo 2 do `DEPLOY.md`) |
@@ -66,7 +66,13 @@
   e `POST /v1/grade/preencher` (rascunhos nos próximos livres). Agenda › Grade.
 - Conector MCP (`functions/mcp`, `_compartilhado/mcp.js`) com 17 ferramentas;
   ChatGPT por Ações (`openapi-chatgpt.json`) ou conector MCP.
-- Testado com banco simulado (8 testes de integração). **Não instalado** no
+- **Como no Metricool**: `agendar_reel` (MCP) / `agendarReel` (GPT) /
+  `POST /v1/reels` programa em um passo a partir do LINK do vídeo (Drive
+  "qualquer pessoa com o link", Dropbox, MP4 direto): o servidor baixa
+  (`importar.js`: só https, sem endereço interno, redirecionamentos
+  conferidos, limite de tamanho, tipo pelos bytes), guarda e programa.
+  Repetir não duplica. Anexo da conversa não é link: precisa do Drive/painel.
+- Testado com banco e "internet" simulados (11 testes de integração). **Não instalado** no
   ChatGPT/Claude reais: depende do servidor (passo 1). Passo a passo:
   `docs/INTEGRACAO-ASSISTENTES.md`.
 

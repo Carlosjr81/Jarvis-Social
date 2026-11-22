@@ -12,6 +12,7 @@ import { interpretar, AJUDA } from "./comandos.js";
 import { ErroBanco } from "./banco.js";
 import { cifrar, sha256Hex } from "./cifra.js";
 import { criarAcesso, ErroAcesso } from "./api-acesso.js";
+import { baixar, ErroImportar } from "./importar.js";
 
 export const VERSAO_API = "2026-11-22a";
 const PAPEIS_EDICAO = ["dono", "admin", "editor"];
@@ -49,7 +50,7 @@ export function horariosPadrao(n, atuais = []) {
   return Array.from({ length: n }, (_, i) => { const m = Math.round((ini + passo * i) / 5) * 5; return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`; });
 }
 
-export function criarApi({ banco, armazenamento, instagram, agora = () => new Date().toISOString(), segredos = {}, modo = "producao", limites = {}, autenticacao = null, cutucarWorker = null }) {
+export function criarApi({ banco, armazenamento, instagram, agora = () => new Date().toISOString(), segredos = {}, modo = "producao", limites = {}, autenticacao = null, cutucarWorker = null, buscar = globalThis.fetch }) {
   const demonstracao = modo === "demonstracao";
   const acesso = criarAcesso({ banco, agora, segredos, demonstracao, autenticacao });
   const LIM = { videoBytes: 50 * 1024 * 1024, capaBytes: 8 * 1024 * 1024, antecedenciaMin: 2, ...limites };
@@ -449,6 +450,40 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     }
   };
 
+  // --- importar por link (o que os assistentes usam, como no Metricool)
+  op.importarMidia = async (ctx, c) => {
+    exigir(ctx, PAPEIS_EDICAO);
+    const tipo = c.tipo === "capa" ? "capa" : "video";
+    const max = tipo === "video" ? LIM.videoBytes : LIM.capaBytes;
+    let arq;
+    try { arq = await baixar(c.url, { fetch: buscar, maxBytes: max }); } catch (e) { if (e instanceof ErroImportar) falha(e.codigo === "arquivo_grande" ? 413 : 400, e.codigo, e.message); throw e; }
+    if (!MIMES[tipo].includes(arq.mime)) falha(400, "formato_invalido", tipo === "video" ? "O link não é um vídeo MP4/MOV." : "O link não é uma imagem JPG/PNG.");
+    const h = [...new Uint8Array(await crypto.subtle.digest("SHA-256", arq.bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const iguais = await banco.listar("midias", { org_id: ctx.org.id, sha256: h, tamanho: arq.bytes.length, estado: "pronta" });
+    if (iguais.length) return { midia: iguais[0], reaproveitada: true };
+    const id = crypto.randomUUID();
+    const caminho = `${ctx.org.id}/${id}.${EXT[arq.mime]}`;
+    await armazenamento.enviar(caminho, arq.bytes, arq.mime);
+    const midia = await banco.inserir("midias", { id, org_id: ctx.org.id, tipo, nome: String(c.nome || "importado de link").slice(0, 200), mime: arq.mime, tamanho: arq.bytes.length, sha256: h,
+      caminho, estado: "pronta", miniatura: null, origem_url: String(c.url).slice(0, 500), criado_por: ctx.usuario.id, criado_em: agora(), finalizado_em: agora() });
+    return { midia };
+  };
+  // Um passo só: link (ou id) do vídeo + legenda + quando = Reel programado (ou publicado agora).
+  op.reel = async (ctx, c) => {
+    exigir(ctx, PAPEIS_EDICAO);
+    if (!c.video_id && !c.video_url) falha(400, "falta_video", "Informe video_url (link do vídeo) ou video_id (da biblioteca).");
+    const quando = c.publicar_agora ? "agora" : c.proximo_livre ? "livre" : `${c.data || ""} ${c.hora || ""}`;
+    const chave = c.chave_idempotencia || "reel-" + (await sha256Hex(canonico({ v: c.video_url || c.video_id, k: c.capa_url || c.capa_id, l: c.legenda || "", q: quando, conta: c.conta_id || "" }))).slice(0, 32);
+    const ja = await banco.listar("posts", { org_id: ctx.org.id, chave_idempotencia: chave });
+    if (ja.length) return { post: await vistaPost(ja[0], ctx), repetido: true };
+    const video = c.video_id ? { id: c.video_id } : (await op.importarMidia(ctx, { url: c.video_url, tipo: "video", nome: c.nome })).midia;
+    const capa = c.capa_id ? { id: c.capa_id } : c.capa_url ? (await op.importarMidia(ctx, { url: c.capa_url, tipo: "capa" })).midia : null;
+    const r = await op.criarPost(ctx, { video_id: video.id, capa_id: capa ? capa.id : undefined, conta_id: c.conta_id, legenda: c.legenda || "", data: c.data, hora: c.hora,
+      proximo_livre: !!c.proximo_livre, publicar_agora: !!c.publicar_agora, agendar: c.rascunho ? false : true, fonte: c.fonte, chave_idempotencia: chave });
+    if (c.publicar_agora && cutucarWorker) { try { await cutucarWorker(); } catch { /* o relógio do servidor pega em 1 min */ } }
+    return r;
+  };
+
   // --- a grade de publicação: os próximos horários da frequência, livres ou ocupados
   op.grade = async (ctx, q) => {
     const fuso = ctx.org.fuso || FUSO_PADRAO;
@@ -564,7 +599,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
 
   // ------------------------------------------------------------ roteador HTTP
   // Uma chave de integração vira um "usuário" limitado: só o espaço dela, só os escopos dela.
-  const ROTAS_DA_CHAVE = ["eu", "posts", "grade", "frequencia", "fila", "comandos", "midias", "saude"];
+  const ROTAS_DA_CHAVE = ["eu", "posts", "reels", "grade", "frequencia", "fila", "comandos", "midias", "saude"];
   async function usuarioDaChave(segredo) {
     if (!/^js_[0-9a-f]{48}$/.test(String(segredo || ""))) falha(401, "chave_invalida", "Chave de integração inválida.");
     const [k] = await banco.listar("tokens_api", { hash: await sha256Hex(segredo) });
@@ -589,7 +624,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
       if (usuario && usuario.via_token) {
         if (!ROTAS_DA_CHAVE.includes(r1)) falha(403, "fora_do_escopo", "Esta ação só pode ser feita no painel, com login.");
         if (M !== "GET" && !(r1 === "frequencia" && r2 === "previa") && !usuario.escopos.includes("programar")) falha(403, "so_leitura", "Esta chave é só de leitura.");
-        if (r1 === "midias" && M !== "GET") falha(403, "fora_do_escopo", "Envie vídeos pelo painel; o assistente programa o que já está na biblioteca.");
+        if (r1 === "midias" && M !== "GET" && r2 !== "importar") falha(403, "fora_do_escopo", "O assistente envia vídeo por link (midias/importar ou reels); upload de arquivo é pelo painel.");
       }
       const livre = r1 === "saude" || (r1 === "instagram" && r2 === "retorno") || r1 === "conta" || r1 === "admin";
       if (!livre) await acesso.exigirLiberado(usuario);
@@ -600,6 +635,8 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
       else if (r1 === "organizacoes" && M === "POST") res = await op.criarOrganizacao(usuario, corpo);
       else if (r1 === "eu" && M === "GET") res = await op.eu(await ctx());
       else if (r1 === "organizacao" && M === "PUT") res = await op.ajustarOrganizacao(await ctx(), corpo);
+      else if (r1 === "midias" && r2 === "importar" && M === "POST") res = await op.importarMidia(await ctx(), corpo);
+      else if (r1 === "reels" && !r2 && M === "POST") res = await op.reel(await ctx(), corpo);
       else if (r1 === "midias" && !r2 && M === "POST") res = await op.criarMidia(await ctx(), corpo);
       else if (r1 === "midias" && !r2 && M === "GET") res = await op.listarMidias(await ctx());
       else if (r1 === "midias" && r3 === "finalizar" && M === "POST") res = await op.finalizarMidia(await ctx(), r2);

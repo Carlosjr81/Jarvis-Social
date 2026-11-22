@@ -7,7 +7,7 @@ import { criarInstagramSimulado } from "../supabase/functions/_compartilhado/ins
 import { cifrar } from "../supabase/functions/_compartilhado/cifra.js";
 import { TERMOS } from "../supabase/functions/_compartilhado/termos.js";
 
-export function ambiente({ agora = "2026-11-22T15:00:00.000Z", falhas = {}, estado = null, emailsDono = ["dono@x"] } = {}) {
+export function ambiente({ agora = "2026-11-22T15:00:00.000Z", falhas = {}, estado = null, emailsDono = ["dono@x"], buscar } = {}) {
   const rel = { t: agora };
   const relogio = () => rel.t;
   const banco = new BancoMemoria(estado);
@@ -16,7 +16,7 @@ export function ambiente({ agora = "2026-11-22T15:00:00.000Z", falhas = {}, esta
   const segredos = { urlPainel: "https://painel.exemplo/", appId: "1", appSecret: "s", redirectUri: "https://x/retorno", chaveCifra: btoa(String.fromCharCode(...new Uint8Array(32).fill(7))), emailsDono };
   const links = [], apagados = [];
   const autenticacao = { enviarLinkSenha: async (e) => links.push(e), apagarUsuario: async (id) => apagados.push(id) };
-  const api = criarApi({ banco, armazenamento: arm, instagram: ig, agora: relogio, segredos, autenticacao });
+  const api = criarApi({ banco, armazenamento: arm, instagram: ig, agora: relogio, segredos, autenticacao, buscar });
   const worker = (dono = "w1") => criarWorker({ banco, armazenamento: arm, instagram: ig, agora: relogio, segredos, dono, aleatorio: () => 0.5 });
   const avancar = (min) => { rel.t = new Date(Date.parse(rel.t) + min * 60e3).toISOString(); };
   const chamar = async (usuario, metodo, caminho, corpo, consulta) => {
