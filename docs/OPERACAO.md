@@ -16,6 +16,13 @@ Jarvis Mídia Social" e uma legenda que explica o teste, e mostra cada etapa
 (mídia, envio, publicação criada, servidor acordado, Instagram) até o link do
 post. Na demonstração tudo é simulado e a tela diz isso.
 
+## Lançar a propaganda do Jarvis Social
+Início › **📣 Lançar propaganda**: escolha o MP4 da propaganda (montado no
+Jarvis-Claude pelo workflow "Propaganda Jarvis Social", com a sua voz
+aprovada, e baixado no celular), a capa se quiser, confira a legenda pronta e
+a conta, e toque **Lançar agora**: publica na hora e acompanha até o link.
+O vídeo tem rosto e voz do dono: fica no Jarvis-Claude (privado), nunca aqui.
+
 ## Cadastro e usuários
 - Quem abre o painel cria a conta (nome, e-mail, senha) e espera a sua
   liberação; a tela confere sozinha a cada 30 s. Depois aceita os termos.

@@ -14,7 +14,7 @@ import { formatarLocal, partesLocais, somarDias, NOMES_DIA_LONGO, FUSO_PADRAO } 
 import { AJUDA } from "./supabase/functions/_compartilhado/comandos.js";
 import { sugerirEmail, PRAZOS_ACESSO, NOMES_SITUACAO } from "./supabase/functions/_compartilhado/acesso.js";
 
-export const VERSAO_PAINEL = "2026-11-22d";
+export const VERSAO_PAINEL = "2026-11-22e";
 const CH = { sessao: "jarvis-social:sessao", demo: "jarvis-social:demo", modo: "jarvis-social:modo", rascunho: "jarvis-social:rascunho", email: "jarvis-social:email" };
 const ls = {
   ler(k, padrao = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch { return padrao; } },
@@ -390,7 +390,7 @@ telas.inicio = async (el) => {
     ${contaEstado && contaEstado.plano.tipo === "teste" ? `<a class="faixa" href="#planos" style="display:block">Período de teste ${esc(contaEstado.plano.texto.replace("Em teste", "").trim())}. Ver planos ▶</a>` : ""}
     ${eu.alertas.map((a) => `<div class="faixa ${a.tipo === "pausa" ? "" : "erro"}">${esc(a.texto)} ${a.post_id ? `<a href="#post/${esc(a.post_id)}">ver</a>` : a.acao === "ajustes" ? `<a href="#ajustes">resolver</a>` : a.acao === "retomar" ? `<button data-fila="retomar">Retomar</button>` : ""}</div>`).join("")}
     <a class="botao primario grande" href="#criar" style="display:flex;align-items:center;justify-content:center;text-decoration:none">＋ Novo Reel</a>
-    <button class="grande" id="teste-imediato" style="margin-top:8px">🧪 Teste de publicação imediato</button>
+    <div class="linha" style="margin-top:8px"><button id="lancar-propaganda">📣 Lançar propaganda</button><button id="teste-imediato">🧪 Teste imediato</button></div>
     <div class="cartao"><form id="f-cmd"><label for="cmd">Diga o que fazer</label>
       <input id="cmd" placeholder="Ex.: Mostre minha agenda da semana" autocomplete="off" enterkeyhint="send">
       <button class="primario" style="margin-top:8px;width:100%">Enviar</button></form>
@@ -400,6 +400,7 @@ telas.inicio = async (el) => {
     ${proximos.length ? proximos.map((p) => cartaoPost(p)).join("") : `<p class="fraco">Nada programado. Toque em Novo Reel.</p>`}`;
   el.querySelectorAll("[data-fila]").forEach((b) => (b.onclick = async () => { await cli.chamar("POST", "/v1/fila/retomar"); await iniciar(); }));
   $("#teste-imediato").onclick = abrirTestePublicacao;
+  $("#lancar-propaganda").onclick = abrirPropaganda;
   $("#f-cmd").onsubmit = (e) => { e.preventDefault(); executarComando($("#cmd").value, {}); };
 };
 
@@ -707,10 +708,11 @@ function abrirTestePublicacao() {
   $("#tp-fechar").onclick = () => { fecharFolha(); mostrar(); };
   $("#tp-ir") && ($("#tp-ir").onclick = () => rodarTestePublicacao($("#tp-conta") && $("#tp-conta").value));
 }
-async function rodarTestePublicacao(contaId) {
+async function rodarTestePublicacao(contaId, op = {}) {
   const demo = cli.modo === "demonstracao";
   const conta = contasUsaveis().find((c) => c.id === contaId);
-  if (!demo && conta && !conta.simulado && !confirm(`Publicar o Reel de teste agora em @${conta.usuario_rede}?`)) return;
+  const nomeCoisa = op.nome || "o Reel de teste";
+  if (!demo && conta && !conta.simulado && !confirm(`Publicar ${nomeCoisa} agora em @${conta.usuario_rede}?`)) return;
   $("#tp-ir").disabled = true; $("#tp-conta") && ($("#tp-conta").disabled = true);
   const st = Object.fromEntries(ETAPAS_TESTE.map(([k]) => [k, "esperando"]));
   const detalhe = {};
@@ -721,17 +723,17 @@ async function rodarTestePublicacao(contaId) {
   try {
     etapa("midia", "andando");
     const baixar = async (url, nome, tipo) => { const r = await fetch(url, { cache: "no-store" }); if (!r.ok) throw new Error(`Não baixou ${url} (${r.status}).`); return new File([await r.blob()], nome, { type: tipo }); };
-    const [video, capa] = await Promise.all([baixar("teste/video-teste.mp4", "teste-jarvis.mp4", "video/mp4"), baixar("teste/capa-teste.jpg", "capa-teste-jarvis.jpg", "image/jpeg")]);
-    etapa("midia", "ok", `${(video.size / 1048576).toFixed(1)} MB + ${Math.round(capa.size / 1024)} KB`);
+    const [video, capa] = op.arquivos ? [op.arquivos.video, op.arquivos.capa] : await Promise.all([baixar("teste/video-teste.mp4", "teste-jarvis.mp4", "video/mp4"), baixar("teste/capa-teste.jpg", "capa-teste-jarvis.jpg", "image/jpeg")]);
+    etapa("midia", "ok", `${(video.size / 1048576).toFixed(1)} MB${capa ? ` + ${Math.round(capa.size / 1024)} KB` : " (capa automática)"}`);
     atual = "video"; etapa("video", "andando");
     const progresso = (k) => ({ style: { set width(x) { etapa(k, "andando", "enviado " + x); } } });
     const v = await enviarMidia("video", video, progresso("video"));
     etapa("video", "ok", v.id.slice(0, 8));
     atual = "capa"; etapa("capa", "andando");
-    const c = await enviarMidia("capa", capa, progresso("capa"));
-    etapa("capa", "ok");
+    const c = capa ? await enviarMidia("capa", capa, progresso("capa")) : null;
+    etapa("capa", "ok", capa ? undefined : "sem capa: o Instagram escolhe um quadro");
     atual = "post"; etapa("post", "andando");
-    const { post } = await cli.chamar("POST", "/v1/posts", { video_id: v.id, capa_id: c.id, conta_id: contaId || undefined, legenda: legendaTeste(), publicar_agora: true, teste: true, chave_idempotencia: "teste-" + novaChave() });
+    const { post } = await cli.chamar("POST", "/v1/posts", { video_id: v.id, capa_id: c ? c.id : undefined, conta_id: contaId || undefined, legenda: op.legenda != null ? op.legenda : legendaTeste(), publicar_agora: true, teste: op.teste !== false, chave_idempotencia: (op.teste === false ? "propaganda-" : "teste-") + novaChave() });
     etapa("post", "ok", `${post.recibo.perfil || "sem conta"} · ${post.estado_texto}`);
     atual = "worker"; etapa("worker", "andando");
     const cut = await cli.chamar("POST", "/v1/worker/cutucar");
@@ -757,7 +759,40 @@ async function rodarTestePublicacao(contaId) {
     etapa(atual, "erro", err.message);
     $("#tp-fim").innerHTML = `<div class="faixa erro">${mensagemErro(err)}</div>`;
   }
-  $("#tp-ir").textContent = "Rodar outro teste"; $("#tp-ir").disabled = false; $("#tp-ir").onclick = abrirTestePublicacao;
+  $("#tp-ir").textContent = op.teste === false ? "Fechar e ver a agenda" : "Rodar outro teste"; $("#tp-ir").disabled = false;
+  $("#tp-ir").onclick = op.teste === false ? () => { fecharFolha(); location.hash = "#agenda"; } : abrirTestePublicacao;
+}
+
+// ------------------------------------------------------------------ lançar a propaganda do Jarvis Social
+// O vídeo da propaganda é montado no Jarvis (workflow "Propaganda Jarvis
+// Social", com a voz aprovada) e baixado no celular: tem rosto e voz do dono,
+// por isso não fica neste repositório público. Aqui é só escolher e lançar.
+const LEGENDA_PROPAGANDA = `Atrasado, reunião, almoço correndo, academia… e o post de hoje? 😅
+
+Com o Jarvis Social você escolhe o vídeo, a legenda e o horário pelo celular, e ele publica no Instagram na hora certa. Na correria, o Jarvis posta por você. 🚀
+
+Quer usar? Comenta JARVIS ou chama no direct.
+
+#jarvissocial #instagram #reels #produtividade #criadordeconteudo`;
+function abrirPropaganda() {
+  const demo = cli.modo === "demonstracao";
+  abrirFolha(`<h2>📣 Lançar propaganda no Reels</h2>
+    <p class="fraco">Escolha o vídeo da propaganda (o MP4 do Jarvis, salvo no celular) e, se quiser, a capa. A legenda já vem pronta.</p>
+    <label for="pp-video">Vídeo da propaganda (MP4 ou MOV)</label><input id="pp-video" type="file" accept="video/mp4,video/quicktime,video/*">
+    <label for="pp-capa">Capa (opcional, JPG ou PNG)</label><input id="pp-capa" type="file" accept="image/jpeg,image/png">
+    <label for="pp-legenda">Legenda</label><textarea id="pp-legenda" maxlength="2200">${esc(LEGENDA_PROPAGANDA)}</textarea>
+    ${seletorConta("tp-conta")}
+    <div class="faixa ${demo ? "demo" : "erro"}">${demo ? "DEMONSTRAÇÃO: tudo simulado neste aparelho; nada vai ao Instagram." : "Publica DE VERDADE agora no perfil escolhido. Para programar outro horário, use o Novo Reel."}</div>
+    <div id="tp-etapas"></div><div id="tp-fim"></div>
+    <button class="primario grande" id="tp-ir">${demo ? "Lançar (simulado)" : "Lançar agora"}</button>
+    <button class="grande" id="tp-fechar" style="margin-top:8px">Fechar</button>`);
+  $("#tp-fechar").onclick = () => { fecharFolha(); mostrar(); };
+  $("#tp-ir").onclick = () => {
+    const video = $("#pp-video").files[0];
+    if (!video) return alert("Escolha o vídeo da propaganda.");
+    const capa = $("#pp-capa").files[0] || null;
+    rodarTestePublicacao($("#tp-conta") && $("#tp-conta").value, { arquivos: { video, capa }, legenda: $("#pp-legenda").value, teste: false, nome: "a propaganda" });
+  };
 }
 
 // ------------------------------------------------------------------ painel de usuários (só o dono)

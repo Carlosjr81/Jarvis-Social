@@ -120,6 +120,14 @@ if (pw) {
       await pg.locator("[data-filtro=publicados]").click();
       await pg.getByText("Publicação simulada (sem link real)").first().waitFor();
       igual(await pg.getByText("Ver no Instagram").count(), 0, "post simulado nunca ganha link de Instagram");
+      // Lançar propaganda (demonstração): escolhe o vídeo, legenda pronta, publica agora.
+      await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
+      await pg.click("#lancar-propaganda");
+      verdade((await pg.inputValue("#pp-legenda")).includes("o Jarvis posta por você"), "legenda pronta");
+      await pg.setInputFiles("#pp-video", path.join(RAIZ, "teste/video-teste.mp4"));
+      await pg.click("#tp-ir");
+      await pg.locator("#tp-fim .carimbo").waitFor({ timeout: 30000 });
+      await pg.click("#tp-fechar");
       // Painel de usuários do dono: simular um cadastro e liberar por 30 dias.
       await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#usuarios`);
       await pg.getByRole("heading", { name: "Painel de usuários" }).waitFor();
