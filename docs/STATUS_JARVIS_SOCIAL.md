@@ -8,9 +8,9 @@
 |---|---|
 | Repositório | `Carlosjr81/Jarvis-Social` (próprio; saiu do Super-HQs em 22/11/2026) |
 | Branch | `main` (código da fundação veio do commit `a8cace1` da branch `ccr-272ef392-6vuh6i` do Super-HQs) |
-| Actions | workflow *Jarvis Social* (testes + implantação) e *relógio reserva* |
+| Actions | workflow *Jarvis Social* dispara sozinho a cada push (repositório público). Run 45030840705 (22/11/2026): verde, mas SQL e painel não tinham rodado no runner; corrigido para instalar PostgreSQL e Chromium e reprovar se faltarem |
 | Etapa | A concluída (fundação) + B em parte (agendamento e adaptador Meta escritos e testados com simulador) |
-| Testes | `node testes/rodar.mjs` → 74 passou / 0 falhou (22/11/2026, sessão na nuvem) |
+| Testes | `node testes/rodar.mjs` → 74 passou / 0 falhou (22/11/2026, sessão na nuvem e Actions) |
 | Painel publicado | **Ainda não.** Depois de ligar o Pages: https://carlosjr81.github.io/Jarvis-Social/ (abre em DEMONSTRAÇÃO até o servidor existir) |
 | Servidor (Supabase) | **Não criado.** Depende do passo 1 do dono em `docs/DEPLOY.md` |
 | Instagram real | **Não conectado / nenhuma publicação real feita.** Depende do app da Meta (passo 2 do `DEPLOY.md`) |

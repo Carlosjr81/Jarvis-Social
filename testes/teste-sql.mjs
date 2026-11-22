@@ -4,9 +4,10 @@ import { teste, igual, verdade, rodar } from "./base.mjs";
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs"; import os from "node:os"; import path from "node:path";
 
-const BIN = ["/usr/lib/postgresql/16/bin", "/usr/lib/postgresql/17/bin", "/usr/lib/postgresql/15/bin"].find((d) => fs.existsSync(d + "/initdb"));
+const BIN = ["18", "17", "16", "15"].map((v) => `/usr/lib/postgresql/${v}/bin`).find((d) => fs.existsSync(d + "/initdb"));
 const MIGRACAO = new URL("../supabase/migrations/20261122000000_inicial.sql", import.meta.url).pathname;
 
+if (!BIN && process.env.JS_EXIGIR_TUDO) { console.log("PostgreSQL ausente e JS_EXIGIR_TUDO ligado"); console.log("\n0 passou / 1 falhou"); process.exit(1); }
 if (!BIN) { console.log("aviso: PostgreSQL ausente; suíte SQL não rodou (roda no Actions)"); console.log("\n0 passou / 0 falhou"); process.exit(0); }
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "jsql-"));

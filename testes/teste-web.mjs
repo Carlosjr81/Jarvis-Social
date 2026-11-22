@@ -90,6 +90,7 @@ if (pw) {
       igual(erros, [], "erros de JavaScript na página");
     } finally { await nav.close(); srv.close(); }
   });
-} else console.log("aviso: Playwright ausente; fluxo no navegador não rodou");
+} else if (process.env.JS_EXIGIR_TUDO) teste("Playwright presente (exigido no Actions)", () => { throw new Error("Playwright ausente"); });
+else console.log("aviso: Playwright ausente; fluxo no navegador não rodou");
 
 rodar("painel: sintaxe, PWA e fluxo no navegador (viewport de celular)");

@@ -28,8 +28,17 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
-      # O runner já traz o PostgreSQL; a suíte SQL sobe um cluster temporário.
+      # A suíte SQL sobe um PostgreSQL temporário e a do painel abre o
+      # Chromium em tela de celular. No Actions os dois são obrigatórios
+      # (JS_EXIGIR_TUDO): faltar não pode virar "passou sem testar".
+      - name: PostgreSQL e Chromium
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql > /dev/null
+          npm install --no-save --silent playwright@1.49.1
+          npx playwright install --with-deps chromium > /dev/null
       - name: Testes (núcleo, API, worker, SQL, painel)
+        env:
+          JS_EXIGIR_TUDO: "1"
         run: node testes/rodar.mjs
 
   implantar:
