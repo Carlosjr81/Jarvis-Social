@@ -2,8 +2,8 @@
  "openapi": "3.0.3",
  "info": {
   "title": "Jarvis Social API",
-  "version": "2026-11-22a",
-  "description": "Mesma API do painel. Tenant sempre derivado da sessão. Horários de entrada em data/hora locais do fuso do espaço (padrão America/Sao_Paulo); saída em UTC + fuso + texto local."
+  "version": "2026-11-22b",
+  "description": "Mesma API do painel. Tenant sempre derivado da sessão. Horários de entrada em data/hora locais do fuso do espaço (padrão America/Sao_Paulo); saída em UTC + fuso + texto local. Rotas do produto exigem conta liberada e termos aceitos (403 acesso_pendente|acesso_bloqueado|acesso_vencido|acesso_pagar|termos_pendentes)."
  },
  "servers": [
   {
@@ -1061,6 +1061,272 @@
       }
      }
     ]
+   }
+  },
+  "/v1/conta": {
+   "get": {
+    "summary": "Situação da conta, plano, termos, cobrança e recado",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
+   },
+   "put": {
+    "summary": "Mudar o nome",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
+   }
+  },
+  "/v1/conta/termos": {
+   "post": {
+    "summary": "Aceitar os termos da versão atual",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
+   }
+  },
+  "/v1/conta/recado-visto": {
+   "post": {
+    "summary": "Marcar o recado do dono como visto",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
+   }
+  },
+  "/v1/conta/pagamentos": {
+   "get": {
+    "summary": "Meus pagamentos",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
+   },
+   "post": {
+    "summary": "Avisar pagamento e gerar o Pix copia e cola",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
+   }
+  },
+  "/v1/conta/apagar": {
+   "post": {
+    "summary": "Apagar a própria conta (confirmar: APAGAR)",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
+   }
+  },
+  "/v1/admin/resumo": {
+   "get": {
+    "summary": "Números do painel e configuração (dono)",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
+   }
+  },
+  "/v1/admin/contas": {
+   "get": {
+    "summary": "Contas com filtro, busca ou CSV (dono)",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
+   }
+  },
+  "/v1/admin/contas/{id}": {
+   "post": {
+    "summary": "liberar|renovar|bloquear|desbloquear|recado|nota|cortesia|tirar_cortesia|registrar_pagamento|link_senha|remover (dono)",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
+   }
+  },
+  "/v1/admin/liberar-todos": {
+   "post": {
+    "summary": "Liberar todos que aguardam (dono)",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
+   }
+  },
+  "/v1/admin/config": {
+   "put": {
+    "summary": "Aprovação automática, cobrança, planos, Pix (dono)",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
+   }
+  },
+  "/v1/admin/pagamentos": {
+   "get": {
+    "summary": "Pagamentos e totais, ou CSV (dono)",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
+   }
+  },
+  "/v1/admin/pagamentos/{id}": {
+   "post": {
+    "summary": "confirmar|recusar|devolver (dono)",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
+   }
+  },
+  "/v1/admin/aceites": {
+   "get": {
+    "summary": "Histórico de aceites dos termos (dono)",
+    "security": [
+     {
+      "sessao": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "ok"
+     },
+     "403": {
+      "$ref": "#/components/responses/Erro"
+     }
+    }
    }
   }
  },

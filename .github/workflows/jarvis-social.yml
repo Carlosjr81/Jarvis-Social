@@ -53,12 +53,15 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.JS_SUPABASE_DB_PASSWORD }}
       META_APP_ID: ${{ secrets.JS_META_APP_ID }}
       META_APP_SECRET: ${{ secrets.JS_META_APP_SECRET }}
-      EMAILS: ${{ secrets.JS_EMAILS_PERMITIDOS }}
+      EMAIL_DONO: ${{ secrets.JS_EMAIL_DONO }}
       PAINEL: https://carlosjr81.github.io/Jarvis-Social/
     steps:
       - name: Segredos presentes?
         id: seg
         run: |
+          if [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -z "$EMAIL_DONO" ]; then
+            echo "::warning::Falta JS_EMAIL_DONO: sem ele ninguém aprova cadastros no painel."
+          fi
           if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$REF" ] || [ -z "$SUPABASE_DB_PASSWORD" ]; then
             echo "::warning::Implantação pulada: faltam JS_SUPABASE_ACCESS_TOKEN, JS_SUPABASE_PROJECT_REF ou JS_SUPABASE_DB_PASSWORD (veja docs/DEPLOY.md)."
             echo "ok=0" >> "$GITHUB_OUTPUT"
@@ -88,7 +91,7 @@ jobs:
           ARGS=(JS_SEGREDO_WORKER="$WORKER" JS_CHAVE_CIFRA="$CIFRA" JS_URL_PAINEL="$PAINEL" JS_ORIGENS_PERMITIDAS="https://carlosjr81.github.io")
           [ -n "$META_APP_ID" ] && ARGS+=(JS_META_APP_ID="$META_APP_ID")
           [ -n "$META_APP_SECRET" ] && ARGS+=(JS_META_APP_SECRET="$META_APP_SECRET")
-          [ -n "$EMAILS" ] && ARGS+=(JS_EMAILS_PERMITIDOS="$EMAILS")
+          [ -n "$EMAIL_DONO" ] && ARGS+=(JS_EMAIL_DONO="$EMAIL_DONO")
           supabase secrets set --project-ref "$REF" "${ARGS[@]}"
       - name: Funções (api e worker)
         if: steps.seg.outputs.ok == '1'

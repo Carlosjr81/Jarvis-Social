@@ -35,6 +35,10 @@ no Deno (servidor) e no navegador (DEMONSTRAÇÃO).
 - Toda mudança de post é condicionada à versão; o worker só age se a versão
   do job for a do post; resposta ambígua ao publicar = conferir, nunca reenviar.
 - Tenant vem da sessão (membros), nunca de campo do cliente.
+- Acesso à plataforma: `api-acesso.js`. Toda rota do produto passa por
+  `exigirLiberado`; só `/v1/conta/*`, `/v1/admin/*` (dono), saúde e retorno
+  do OAuth ficam fora. Dono = `JS_EMAIL_DONO` **com e-mail confirmado**.
+  Termos em `termos.js`: mudou o texto, suba a versão; aceites não se apagam.
 - Sem teto comercial de publicações; só o limite técnico de 48/dia e a cota da rede.
 - Fuso padrão America/Sao_Paulo; banco em UTC; nunca o fuso da máquina.
 - Nada pago sem autorização do dono.

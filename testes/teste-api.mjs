@@ -7,6 +7,7 @@ let n = 0; const chave = () => "k" + (++n);
 teste("sem login: 401; sem espaço: 403 pedindo para criar", async () => {
   const e = ambiente();
   igual((await e.chamar(null, "GET", "/v1/eu")).status, 401);
+  await e.liberar(A);
   igual((await e.chamar(A, "GET", "/v1/eu")).corpo.erro, "sem_organizacao");
 });
 
@@ -50,6 +51,8 @@ teste("isolamento: B não lê, edita, cancela nem usa mídia de A pelo ID", asyn
   igual((await e.chamar(B, "POST", "/v1/posts", { video_id: a.video.id, legenda: "x", chave_idempotencia: chave() })).corpo.erro, "midia_nao_encontrada");
   igual((await e.chamar(B, "GET", "/v1/posts")).corpo.posts.length, 0);
   igual((await e.chamar(B, "GET", "/v1/eu", null, { org_id: a.org.id })).status, 404, "org_id de outro não escolhe tenant");
+  const cA = (await e.banco.listar("conexoes", { org_id: a.org.id }))[0];
+  igual((await e.chamar(B, "POST", "/v1/posts", { video_id: (await e.banco.listar("midias", { org_id: (await e.banco.listar("membros", { usuario_id: "b" }))[0].org_id }))[0].id, conta_id: cA.id, legenda: "x", chave_idempotencia: chave() })).corpo.erro, "conta_nao_encontrada", "conta do Instagram de outro espaço");
 });
 
 teste("editar, pausar e cancelar sobem a versão e deixam o job antigo obsoleto", async () => {
@@ -153,14 +156,6 @@ teste("banco em memória: atualização condicionada à versão", async () => {
   const b = new BancoMemoria(); const p = await b.inserir("posts", { versao: 1, estado: "scheduled" });
   verdade(await b.atualizar("posts", p.id, { versao: 2 }, { versao: 1 }));
   igual(await b.atualizar("posts", p.id, { versao: 3 }, { versao: 1 }), null);
-});
-
-teste("cadastro fechado: só e-mail liberado cria espaço", async () => {
-  const { BancoMemoria: BM } = await import("../supabase/functions/_compartilhado/banco.js");
-  const { criarApi } = await import("../supabase/functions/_compartilhado/api.js");
-  const api = criarApi({ banco: new BM(), armazenamento: null, instagram: null, segredos: { emailsPermitidos: ["dono@x"] } });
-  igual((await api.tratar({ metodo: "POST", caminho: "/v1/organizacoes", usuario: { id: "1", email: "outro@x" } })).corpo.erro, "cadastro_fechado");
-  igual((await api.tratar({ metodo: "POST", caminho: "/v1/organizacoes", usuario: { id: "2", email: "Dono@x" } })).status, 200);
 });
 
 rodar("API: agendamento, isolamento, idempotência, frequência e comandos");

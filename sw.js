@@ -1,13 +1,14 @@
 // Jarvis Social: service worker próprio (escopo só desta pasta).
 // Guarda a casca do painel para abrir sem rede. NUNCA guarda a API:
 // agendamento só vale depois de chegar ao servidor.
-const CACHE = "jarvis-social-v1";
+const CACHE = "jarvis-social-v2";
 const CASCA = ["./", "./index.html", "./app.js", "./config.js", "./manifest.json", "./icone.svg",
   "./supabase/functions/_compartilhado/api.js", "./supabase/functions/_compartilhado/tempo.js",
   "./supabase/functions/_compartilhado/frequencia.js", "./supabase/functions/_compartilhado/estados.js",
   "./supabase/functions/_compartilhado/comandos.js", "./supabase/functions/_compartilhado/banco.js",
   "./supabase/functions/_compartilhado/cifra.js", "./supabase/functions/_compartilhado/armazenamento.js",
-  "./supabase/functions/_compartilhado/instagram.js", "./supabase/functions/_compartilhado/worker.js"];
+  "./supabase/functions/_compartilhado/instagram.js", "./supabase/functions/_compartilhado/worker.js",
+  "./supabase/functions/_compartilhado/acesso.js", "./supabase/functions/_compartilhado/api-acesso.js", "./supabase/functions/_compartilhado/termos.js"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => Promise.all(CASCA.map((u) => c.add(new Request(u, { cache: "reload" })).catch(() => {}))))); self.skipWaiting(); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith("jarvis-social-") && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener("fetch", (e) => {

@@ -47,6 +47,7 @@ export class BancoMemoria {
   }
   async inserir(tabela, obj) {
     const o = { id: novoId(), ...structuredClone(obj) };
+    if (this._tab(tabela).some((x) => x.id === o.id)) throw new ErroBanco("conflito_unico", `${tabela}: id repetido`);
     for (const campos of UNICOS[tabela] || []) {
       if (campos.some((c) => o[c] == null)) continue;
       if (this._tab(tabela).some((x) => campos.every((c) => x[c] === o[c]))) throw new ErroBanco("conflito_unico", `${tabela}: ${campos.join("+")} repetido`);
@@ -59,6 +60,12 @@ export class BancoMemoria {
     if (!o || !casa(o, condicao)) return null;
     Object.assign(o, structuredClone(mudancas)); this._salvar();
     return structuredClone(o);
+  }
+  async apagar(tabela, filtros) {
+    const antes = this._tab(tabela).length;
+    this.t[tabela] = this._tab(tabela).filter((o) => !casa(o, filtros));
+    if (this.t[tabela].length !== antes) this._salvar();
+    return antes - this.t[tabela].length;
   }
   async reivindicarJobs({ agora, dono, leaseSeg = 300, limite = 5 }) {
     const pausadas = new Set(this._tab("organizacoes").filter((o) => o.fila_pausada).map((o) => o.id));
@@ -127,6 +134,12 @@ export class BancoPostgrest {
     const q = [`id=eq.${encodeURIComponent(id)}`, ...this._filtros(condicao)];
     const r = await this._req("PATCH", `/${tabela}?${q.join("&")}`, mudancas, { Prefer: "return=representation" });
     return r[0] || null;
+  }
+  async apagar(tabela, filtros) {
+    const q = this._filtros(filtros);
+    if (!q.length) throw new ErroBanco("erro_banco", "apagar sem filtro");
+    const r = await this._req("DELETE", `/${tabela}?${q.join("&")}`, undefined, { Prefer: "return=representation" });
+    return (r || []).length;
   }
   async reivindicarJobs({ agora, dono, leaseSeg = 300, limite = 5 }) {
     return this._req("POST", "/rpc/reivindicar_jobs", { p_agora: agora, p_dono: dono, p_lease_seg: leaseSeg, p_limite: limite });

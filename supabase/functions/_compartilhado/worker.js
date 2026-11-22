@@ -7,6 +7,7 @@ import { ErroRede } from "./instagram.js";
 import { decifrar, cifrar } from "./cifra.js";
 import { transicao } from "./estados.js";
 import { proximoSlotLivre, politicaPadrao } from "./frequencia.js";
+import { criarAcesso } from "./api-acesso.js";
 
 export const MAX_TENTATIVAS = 5;
 const ESPERA_STATUS_SEG = 30;
@@ -20,6 +21,7 @@ export function espera(tentativa, { esperarSeg, aleatorio = Math.random } = {}) 
 }
 
 export function criarWorker({ banco, armazenamento, instagram, agora = () => new Date().toISOString(), segredos = {}, dono = "worker", aleatorio = Math.random, registrar: log = () => {} }) {
+  const acesso = criarAcesso({ banco, agora, segredos });
   const mais = (seg) => new Date(Date.parse(agora()) + seg * 1000).toISOString();
 
   async function evento(e) { try { await banco.inserir("eventos", e); } catch { /* a versão protege */ } }
@@ -62,6 +64,13 @@ export function criarWorker({ banco, armazenamento, instagram, agora = () => new
     if (["published", "cancelled", "failed", "paused", "draft", "awaiting_approval"].includes(post.estado)) { await fimJob(job, "obsoleto"); return "obsoleto"; }
     const org = await banco.obter("organizacoes", post.org_id);
     if (org.fila_pausada) { await adiar(job, 60); return "fila_pausada"; }
+    // Conta do dono do espaço bloqueada, vencida ou sem plano: nada novo sai
+    // (o que já foi pedido à rede continua sendo conferido).
+    if (!post.container_id && ["scheduled", "retry_wait"].includes(post.estado) && !(await acesso.orgComAcesso(org.id))) {
+      await banco.atualizar("posts", post.id, { ultimo_erro: "Acesso ao Jarvis Social suspenso (aprovação, prazo ou plano). A publicação espera a liberação." }, { versao: post.versao });
+      await adiar(job, 3600);
+      return "acesso_suspenso";
+    }
 
     // Atraso (worker parado, fila retomada...): nunca despejar vários de uma vez.
     if (post.estado === "scheduled" && !post.container_id) {

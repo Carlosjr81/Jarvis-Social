@@ -21,6 +21,11 @@ teste("manifest e ícone existem; SW com escopo da pasta", () => {
   verdade(fs.readFileSync(path.join(RAIZ, "app.js"), "utf8").includes(`register("./sw.js", { scope: "./" })`));
 });
 teste(".nojekyll presente (o Pages ignoraria _compartilhado/ sem ele)", () => verdade(fs.existsSync(path.join(RAIZ, ".nojekyll"))));
+teste("todo módulo compartilhado importado está na casca do SW", () => {
+  const sw = fs.readFileSync(path.join(RAIZ, "sw.js"), "utf8");
+  const pasta = path.join(RAIZ, "supabase/functions/_compartilhado");
+  for (const f of fs.readdirSync(pasta).filter((x) => x.endsWith(".js"))) verdade(sw.includes("_compartilhado/" + f), "falta no sw.js: " + f);
+});
 teste("todo arquivo da casca do SW existe", () => {
   const sw = fs.readFileSync(path.join(RAIZ, "sw.js"), "utf8");
   const lista = [...sw.matchAll(/"\.\/([^"]*)"/g)].map((m) => m[1]).filter(Boolean);
@@ -48,9 +53,15 @@ if (pw) {
       const ctx = await nav.newContext({ viewport: { width: 360, height: 740 }, locale: "pt-BR", timezoneId: "Asia/Tokyo" });
       const pg = await ctx.newPage();
       const erros = []; pg.on("pageerror", (e) => erros.push(e.message));
-      pg.on("dialog", (d) => d.accept());
+      pg.on("dialog", (d) => d.type() === "prompt" ? d.accept(d.message().includes("Qual @") ? "loja.exemplo" : d.defaultValue()) : d.accept());
       await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
+      // Na demonstração você é o dono: entra direto (o dono não aceita os próprios termos).
       await pg.getByText("DEMONSTRAÇÃO").first().waitFor();
+      // Conta do dono já conectada (simulada) e uma segunda conta.
+      await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#ajustes`);
+      await pg.getByText("@carlos.jr.81").first().waitFor();
+      await pg.click("#conectar"); await pg.getByText("@loja.exemplo").waitFor();
+      await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
       await pg.getByRole("link", { name: "＋ Novo Reel" }).click();
       await pg.setInputFiles("#in-video", path.join(RAIZ, "testes/amostras/video-teste.mp4"));
       await pg.locator(".previa video").waitFor();
@@ -63,10 +74,13 @@ if (pw) {
       const alvo = new Date(Date.now() + 20 * 864e5).toISOString().slice(0, 10);
       await pg.fill("#in-data", alvo); await pg.fill("#in-hora", "10:00");
       await pg.click("#avancar");
+      igual(await pg.locator("#in-conta option:checked").innerText(), "@carlos.jr.81 (simulada)", "conta padrão marcada");
+      await pg.selectOption("#in-conta", { label: "@loja.exemplo (simulada)" });
       await pg.click("#programar");
       await pg.getByText("Demonstração (simulado)").waitFor({ timeout: 15000 });
       const recibo = await pg.locator("dl.recibo").innerText();
       verdade(recibo.includes(`${alvo.split("-").reverse().join("/")} às 10:00 (America/Sao_Paulo)`), "fuso errado no recibo: " + recibo);
+      verdade(recibo.includes("@loja.exemplo"), "conta escolhida no recibo: " + recibo);
       // fechar e reabrir
       await pg.reload(); await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#agenda`);
       await pg.getByText("Treino depois dos 40").first().waitFor();
@@ -86,7 +100,17 @@ if (pw) {
       await pg.fill("#cmd", "Altere para dois vídeos por dia"); await pg.click("#f-cmd button");
       await pg.getByText("Nova frequência: 2 por dia").waitFor();
       await pg.click("#cmd-sim"); await pg.getByText("Frequência alterada").waitFor();
+      // Painel de usuários do dono: simular um cadastro e liberar por 30 dias.
+      await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#usuarios`);
+      await pg.getByRole("heading", { name: "Painel de usuários" }).waitFor();
+      await pg.click("#demo-cadastro"); await pg.getByText("(exemplo)").first().waitFor();
+      await pg.locator("[data-gerir]").first().click();
+      await pg.selectOption("#g-prazo", "30"); await pg.click('[data-a="liberar"]');
+      await pg.locator('[data-f="todos"]').click();
+      await pg.locator(".selo.scheduled", { hasText: "Liberado" }).first().waitFor();
       fs.mkdirSync(path.join(RAIZ, "testes/saida"), { recursive: true });
+      await pg.screenshot({ path: path.join(RAIZ, "testes/saida/usuarios-360.png"), fullPage: true });
+      await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
       await pg.screenshot({ path: path.join(RAIZ, "testes/saida/inicio-360.png"), fullPage: true });
       igual(erros, [], "erros de JavaScript na página");
     } finally { await nav.close(); srv.close(); }

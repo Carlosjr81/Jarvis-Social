@@ -24,8 +24,11 @@ Em ~1 min o painel abre em https://carlosjr81.github.io/Jarvis-Social/
    - `JS_SUPABASE_ACCESS_TOKEN` = o token do item 4
    - `JS_SUPABASE_PROJECT_REF` = o Reference ID do item 3
    - `JS_SUPABASE_DB_PASSWORD` = a senha do item 2
-   - (opcional) `JS_EMAILS_PERMITIDOS` = seu e-mail de login no painel, para
-     ninguém mais conseguir criar espaço enquanto a venda não abre.
+   - `JS_EMAIL_DONO` = o e-mail com que você vai entrar no painel. Ele é o
+     **dono**: aprova cadastros, bloqueia, dá prazo, liga a cobrança e confirma
+     pagamentos. Fica só nos segredos (o repositório é público). Só vale depois
+     de **confirmar o e-mail** pelo link do cadastro: sem isso, quem criasse uma
+     conta com o seu e-mail passaria por dono.
 6. Diga ao Claude **"continue"**. Ele dispara o workflow *Jarvis Social*, que:
    aplica o banco, cria o bucket privado, publica a API e o worker, liga o
    relógio a cada minuto (pg_cron), configura o login para a URL do painel,

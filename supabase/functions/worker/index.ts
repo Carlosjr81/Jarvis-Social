@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
     banco: new BancoPostgrest({ url: URL_SB, chave: CHAVE }),
     armazenamento: new ArmazenamentoSupabase({ url: URL_SB, chave: CHAVE }),
     instagram: criarInstagram({ config: { ...CONFIG_IG, versao: env("JS_META_VERSAO") || CONFIG_IG.versao } }),
-    segredos: { chaveCifra: env("JS_CHAVE_CIFRA") },
+    segredos: { chaveCifra: env("JS_CHAVE_CIFRA"), emailsDono: env("JS_EMAIL_DONO").split(",").map((s) => s.trim()).filter(Boolean) },
     dono: "worker-" + crypto.randomUUID(),
     registrar: (...a: unknown[]) => console.error(...a),
   });

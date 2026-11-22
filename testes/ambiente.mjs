@@ -5,15 +5,18 @@ import { criarApi } from "../supabase/functions/_compartilhado/api.js";
 import { criarWorker } from "../supabase/functions/_compartilhado/worker.js";
 import { criarInstagramSimulado } from "../supabase/functions/_compartilhado/instagram.js";
 import { cifrar } from "../supabase/functions/_compartilhado/cifra.js";
+import { TERMOS } from "../supabase/functions/_compartilhado/termos.js";
 
-export function ambiente({ agora = "2026-11-22T15:00:00.000Z", falhas = {}, estado = null } = {}) {
+export function ambiente({ agora = "2026-11-22T15:00:00.000Z", falhas = {}, estado = null, emailsDono = ["dono@x"] } = {}) {
   const rel = { t: agora };
   const relogio = () => rel.t;
   const banco = new BancoMemoria(estado);
   const arm = new ArmazenamentoMemoria();
   const ig = criarInstagramSimulado({ falhas, agora: relogio });
-  const segredos = { urlPainel: "https://painel.exemplo/", appId: "1", appSecret: "s", redirectUri: "https://x/retorno", chaveCifra: btoa(String.fromCharCode(...new Uint8Array(32).fill(7))) };
-  const api = criarApi({ banco, armazenamento: arm, instagram: ig, agora: relogio, segredos });
+  const segredos = { urlPainel: "https://painel.exemplo/", appId: "1", appSecret: "s", redirectUri: "https://x/retorno", chaveCifra: btoa(String.fromCharCode(...new Uint8Array(32).fill(7))), emailsDono };
+  const links = [], apagados = [];
+  const autenticacao = { enviarLinkSenha: async (e) => links.push(e), apagarUsuario: async (id) => apagados.push(id) };
+  const api = criarApi({ banco, armazenamento: arm, instagram: ig, agora: relogio, segredos, autenticacao });
   const worker = (dono = "w1") => criarWorker({ banco, armazenamento: arm, instagram: ig, agora: relogio, segredos, dono, aleatorio: () => 0.5 });
   const avancar = (min) => { rel.t = new Date(Date.parse(rel.t) + min * 60e3).toISOString(); };
   const chamar = async (usuario, metodo, caminho, corpo, consulta) => {
@@ -21,8 +24,14 @@ export function ambiente({ agora = "2026-11-22T15:00:00.000Z", falhas = {}, esta
     if (r.excecao) throw r.excecao;
     return r;
   };
+  // Conta da plataforma já aprovada e com os termos aceitos (atalho dos testes antigos).
+  async function liberar(usuario) {
+    if (await banco.obter("contas", usuario.id)) return;
+    await banco.inserir("contas", { id: usuario.id, email: usuario.email, nome: usuario.id, status: "liberado", termos_versao: TERMOS.versao, criado_em: rel.t });
+  }
   // Usuário com espaço, conta do Instagram conectada (simulada) e um vídeo pronto.
   async function preparar(usuario, { conectar = true } = {}) {
+    await liberar(usuario);
     await chamar(usuario, "POST", "/v1/organizacoes", { nome: "Espaço " + usuario.id });
     const eu = (await chamar(usuario, "GET", "/v1/eu")).corpo;
     if (conectar) await banco.inserir("conexoes", { org_id: eu.org.id, rede: "instagram", ig_user_id: "178" + usuario.id, usuario_rede: "conta_" + usuario.id, estado: "ativa", token_cifrado: await cifrar("token-de-teste", segredos.chaveCifra), simulado: false, token_expira_em: "2099-01-01T00:00:00.000Z", atualizado_em: rel.t });
@@ -36,7 +45,7 @@ export function ambiente({ agora = "2026-11-22T15:00:00.000Z", falhas = {}, esta
     arm.receber(r.corpo.midia.caminho, tamanho, mime);
     return (await chamar(usuario, "POST", `/v1/midias/${r.corpo.midia.id}/finalizar`)).corpo.midia;
   }
-  return { rel, relogio, banco, arm, ig, api, worker, avancar, chamar, preparar, enviar };
+  return { rel, relogio, banco, arm, ig, api, worker, avancar, chamar, preparar, enviar, liberar, links, apagados };
 }
 export const A = { id: "a", email: "a@x" };
 export const B = { id: "b", email: "b@x" };

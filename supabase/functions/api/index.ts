@@ -18,9 +18,20 @@ const api = criarApi({
     appId: env("JS_META_APP_ID"), appSecret: env("JS_META_APP_SECRET"),
     redirectUri: `${URL_SB}/functions/v1/api/v1/instagram/retorno`,
     chaveCifra: env("JS_CHAVE_CIFRA"), urlPainel: env("JS_URL_PAINEL"),
-    emailsPermitidos: env("JS_EMAILS_PERMITIDOS").split(",").map((s) => s.trim()).filter(Boolean),
+    emailsDono: env("JS_EMAIL_DONO").split(",").map((s) => s.trim()).filter(Boolean),
   },
   limites: { videoBytes: Number(env("JS_LIMITE_VIDEO_MB") || 50) * 1048576 },
+  // Ações que só o Auth do Supabase faz: link de nova senha e apagar o login (LGPD).
+  autenticacao: {
+    async enviarLinkSenha(email: string) {
+      const r = await fetch(`${URL_SB}/auth/v1/recover`, { method: "POST", headers: { apikey: CHAVE, "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+      if (!r.ok) throw new Error("não enviou o link de senha: " + r.status);
+    },
+    async apagarUsuario(id: string) {
+      const r = await fetch(`${URL_SB}/auth/v1/admin/users/${id}`, { method: "DELETE", headers: { apikey: CHAVE, Authorization: `Bearer ${CHAVE}` } });
+      if (!r.ok && r.status !== 404) throw new Error("não apagou o login: " + r.status);
+    },
+  },
 });
 
 function cors(origem: string | null) {
@@ -38,7 +49,7 @@ async function usuarioDoToken(auth: string | null) {
   const r = await fetch(`${URL_SB}/auth/v1/user`, { headers: { apikey: CHAVE, Authorization: auth } });
   if (!r.ok) return null;
   const u = await r.json();
-  return u && u.id ? { id: u.id, email: u.email } : null;
+  return u && u.id ? { id: u.id, email: u.email, email_confirmado: !!u.email_confirmed_at, nome: (u.user_metadata && (u.user_metadata.nome || u.user_metadata.full_name)) || "" } : null;
 }
 
 Deno.serve(async (req) => {

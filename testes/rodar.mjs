@@ -7,6 +7,7 @@ const aqui = path.dirname(fileURLToPath(import.meta.url));
 const SUITES = [
   ["teste-nucleo", "fusos, frequência, comandos, estados, cifra"],
   ["teste-api", "agendamento, isolamento, idempotência, frequência, comandos, OAuth"],
+  ["teste-acesso", "cadastro com aprovação, termos, prazos, cobrança Pix, painel do dono, contas"],
   ["teste-worker", "publicação, reconciliação, falhas, lease, atraso"],
   ["teste-sql", "migração e fila no PostgreSQL real"],
   ["teste-web", "painel: sintaxe, PWA, demonstração rotulada"],

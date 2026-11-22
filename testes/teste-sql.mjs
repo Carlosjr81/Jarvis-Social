@@ -5,7 +5,8 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs"; import os from "node:os"; import path from "node:path";
 
 const BIN = ["18", "17", "16", "15"].map((v) => `/usr/lib/postgresql/${v}/bin`).find((d) => fs.existsSync(d + "/initdb"));
-const MIGRACAO = new URL("../supabase/migrations/20261122000000_inicial.sql", import.meta.url).pathname;
+const PASTA_MIG = new URL("../supabase/migrations/", import.meta.url).pathname;
+const MIGRACOES = fs.readdirSync(PASTA_MIG).filter((f) => f.endsWith(".sql")).sort().map((f) => PASTA_MIG + f);
 
 if (!BIN && process.env.JS_EXIGIR_TUDO) { console.log("PostgreSQL ausente e JS_EXIGIR_TUDO ligado"); console.log("\n0 passou / 1 falhou"); process.exit(1); }
 if (!BIN) { console.log("aviso: PostgreSQL ausente; suíte SQL não rodou (roda no Actions)"); console.log("\n0 passou / 0 falhou"); process.exit(0); }
@@ -20,8 +21,8 @@ comoPg(BIN + "/pg_ctl", ["-D", dir + "/d", "-o", `-p ${porta} -k ${dir} -c liste
 const psql = (sql) => comoPg("psql", ["-h", dir, "-p", porta, "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-qAt", "-c", sql]).trim();
 process.on("exit", () => { try { comoPg(BIN + "/pg_ctl", ["-D", dir + "/d", "-m", "immediate", "stop"], { stdio: "ignore" }); } catch {} });
 
-teste("a migração aplica sem erro", () => {
-  comoPg("psql", ["-h", dir, "-p", porta, "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-q", "-f", MIGRACAO]);
+teste("as migrações aplicam em ordem, sem erro", () => {
+  for (const m of MIGRACOES) comoPg("psql", ["-h", dir, "-p", porta, "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-q", "-f", m]);
   verdade(psql("select count(*) from posts") === "0");
 });
 teste("idempotência no banco: (org, chave) única", () => {
@@ -62,6 +63,13 @@ teste("concorrência real: duas sessões simultâneas nunca dividem um job", asy
   const [x, y] = await Promise.all([roda("x"), roda("y")]);
   const todos = [...x, ...y];
   igual(new Set(todos).size, todos.length); igual(todos.length, Number(psql(`select count(*) from jobs where org_id='00000000-0000-0000-0000-000000000001'`)));
+});
+teste("aceites dos termos não se alteram nem se apagam", () => {
+  psql(`insert into aceites(conta_id,versao,hash) values ('00000000-0000-0000-0000-000000000009','v','h')`);
+  for (const sql of [`update aceites set versao='x'`, `delete from aceites`]) {
+    const r = spawnSync(raiz ? "runuser" : "psql", [...(raiz ? ["-u", "postgres", "--", "psql"] : []), "-h", dir, "-p", porta, "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", sql], { encoding: "utf8" });
+    verdade(r.status !== 0 && /não podem/.test(r.stderr), sql + ": " + r.stderr);
+  }
 });
 teste("RLS ligada em todas as tabelas", () => igual(psql(`select count(*) from pg_tables where schemaname='public' and not rowsecurity`), "0"));
 

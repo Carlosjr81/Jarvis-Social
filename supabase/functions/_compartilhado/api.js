@@ -11,6 +11,7 @@ import { ESTADOS, EDITAVEIS, CANCELAVEIS, transicao, ErroEstado } from "./estado
 import { interpretar, AJUDA } from "./comandos.js";
 import { ErroBanco } from "./banco.js";
 import { cifrar, sha256Hex } from "./cifra.js";
+import { criarAcesso, ErroAcesso } from "./api-acesso.js";
 
 export const VERSAO_API = "2026-11-22a";
 const PAPEIS_EDICAO = ["dono", "admin", "editor"];
@@ -48,8 +49,9 @@ export function horariosPadrao(n, atuais = []) {
   return Array.from({ length: n }, (_, i) => { const m = Math.round((ini + passo * i) / 5) * 5; return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`; });
 }
 
-export function criarApi({ banco, armazenamento, instagram, agora = () => new Date().toISOString(), segredos = {}, modo = "producao", limites = {} }) {
+export function criarApi({ banco, armazenamento, instagram, agora = () => new Date().toISOString(), segredos = {}, modo = "producao", limites = {}, autenticacao = null }) {
   const demonstracao = modo === "demonstracao";
+  const acesso = criarAcesso({ banco, agora, segredos, demonstracao, autenticacao });
   const LIM = { videoBytes: 50 * 1024 * 1024, capaBytes: 8 * 1024 * 1024, antecedenciaMin: 2, ...limites };
 
   // ------------------------------------------------------------ contexto
@@ -115,14 +117,15 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     return { agendado_utc: iso, origem_horario: "manual", fuso };
   }
 
+  // A conta onde publicar: a escolhida no pedido, senão a padrão do espaço, senão a primeira ativa.
   async function contaPadrao(ctx, contaId) {
     if (contaId) {
       const c = await banco.obter("conexoes", contaId);
-      if (!c || c.org_id !== ctx.org.id) falha(404, "conta_nao_encontrada", "Conta do Instagram não encontrada.");
+      if (!c || c.org_id !== ctx.org.id || c.estado === "revogada") falha(404, "conta_nao_encontrada", "Conta do Instagram não encontrada neste espaço.");
       return c;
     }
     const cs = await banco.listar("conexoes", { org_id: ctx.org.id, estado: { in: ["ativa", "reconectar"] } });
-    return cs[0] || null;
+    return cs.find((c) => c.id === ctx.org.conta_padrao_id) || cs.find((c) => c.estado === "ativa") || cs[0] || null;
   }
 
   function semSegredo(c) { if (!c) return null; const { token_cifrado, ...resto } = c; return resto; }
@@ -176,9 +179,6 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
 
   op.criarOrganizacao = async (usuario, corpo) => {
     if (!usuario || !usuario.id) falha(401, "nao_autenticado", "Entre na sua conta.");
-    // Enquanto a venda não abre: só e-mails liberados criam espaço (JS_EMAILS_PERMITIDOS).
-    const lib = (segredos.emailsPermitidos || []).map((e) => e.toLowerCase());
-    if (lib.length && !lib.includes(String(usuario.email || "").toLowerCase())) falha(403, "cadastro_fechado", "Cadastro ainda fechado para este e-mail.");
     const fuso = corpo.fuso || FUSO_PADRAO;
     if (!fusoValido(fuso)) falha(400, "fuso_invalido", "Fuso desconhecido.");
     const org = await banco.inserir("organizacoes", {
@@ -196,6 +196,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     if (c.fuso != null) { if (!fusoValido(c.fuso)) falha(400, "fuso_invalido", "Fuso desconhecido."); m.fuso = c.fuso; }
     if (c.politica_atraso != null) { if (!["aguardar", "publicar", "reagendar"].includes(c.politica_atraso)) falha(400, "invalido", "Política de atraso inválida."); m.politica_atraso = c.politica_atraso; }
     if (c.tolerancia_atraso_min != null) m.tolerancia_atraso_min = Math.max(0, Math.min(1440, +c.tolerancia_atraso_min || 0));
+    if (c.conta_padrao_id !== undefined) m.conta_padrao_id = c.conta_padrao_id ? (await contaPadrao(ctx, c.conta_padrao_id)).id : null;
     return { org: await banco.atualizar("organizacoes", ctx.org.id, m) };
   };
 
@@ -282,6 +283,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     if (c.capa_id !== undefined) extra.capa_id = c.capa_id ? (await midiaDaOrg(ctx, c.capa_id, "capa")).id : null;
     if (c.video_id !== undefined) extra.video_id = (await midiaDaOrg(ctx, c.video_id, "video")).id;
     if (c.fonte !== undefined) extra.fonte = c.fonte;
+    if (c.conta_id !== undefined) extra.conta_id = (await contaPadrao(ctx, c.conta_id)).id;
     let para = post.estado;
     if (["failed", "retry_wait"].includes(post.estado)) para = "draft";
     if (c.data || c.hora || c.proximo_livre) {
@@ -445,13 +447,16 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
   };
 
   // --- Instagram (OAuth oficial)
-  op.conectarInstagram = async (ctx) => {
+  op.conectarInstagram = async (ctx, corpo = {}) => {
     exigir(ctx, PAPEIS_ADMIN);
     if (demonstracao) {
-      const ja = await banco.listar("conexoes", { org_id: ctx.org.id });
-      const perfil = await instagram.perfil({});
-      if (!ja.length) await banco.inserir("conexoes", { org_id: ctx.org.id, rede: "instagram", ig_user_id: perfil.user_id, usuario_rede: perfil.username, estado: "ativa", token_cifrado: null, token_expira_em: "2099-01-01T00:00:00.000Z", permissoes: [], simulado: true, atualizado_em: agora() });
-      return { url: null, simulado: true };
+      // Na demonstração a "conexão" é simulada, com o @ que o dono escolher.
+      const nome = String(corpo.usuario_rede || "carlos.jr.81").replace(/^@/, "").trim().toLowerCase().replace(/[^a-z0-9._]/g, "").slice(0, 30) || "carlos.jr.81";
+      const ja = (await banco.listar("conexoes", { org_id: ctx.org.id })).find((c) => c.usuario_rede === nome);
+      if (ja) { await banco.atualizar("conexoes", ja.id, { estado: "ativa", atualizado_em: agora() }); return { url: null, simulado: true, conexao: semSegredo(ja) }; }
+      const nova = await banco.inserir("conexoes", { org_id: ctx.org.id, rede: "instagram", ig_user_id: "sim-" + nome, usuario_rede: nome, estado: "ativa", token_cifrado: null, token_expira_em: "2099-01-01T00:00:00.000Z", permissoes: [], simulado: true, atualizado_em: agora() });
+      if (!ctx.org.conta_padrao_id) await banco.atualizar("organizacoes", ctx.org.id, { conta_padrao_id: nova.id });
+      return { url: null, simulado: true, conexao: semSegredo(nova) };
     }
     if (!segredos.appId || !segredos.appSecret || !segredos.redirectUri) falha(503, "instagram_nao_configurado", "O app da Meta ainda não foi configurado no servidor (veja docs/DEPLOY.md, passo Meta).");
     const estado = await banco.inserir("estados_oauth", { org_id: ctx.org.id, usuario_id: ctx.usuario.id, expira_em: new Date(Date.parse(agora()) + 10 * 60e3).toISOString(), usado: false });
@@ -470,7 +475,10 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
       const perfil = await instagram.perfil({ token: t.token });
       const dados = { org_id: est.org_id, rede: "instagram", ig_user_id: String(perfil.user_id || t.igUserId), usuario_rede: perfil.username, tipo_conta: perfil.account_type || null, estado: "ativa", token_cifrado: await cifrar(t.token, segredos.chaveCifra), token_expira_em: t.expiraEm, permissoes: t.permissoes, conectado_por: est.usuario_id, atualizado_em: agora() };
       const existe = await banco.listar("conexoes", { org_id: est.org_id, ig_user_id: dados.ig_user_id });
-      if (existe.length) await banco.atualizar("conexoes", existe[0].id, dados); else await banco.inserir("conexoes", dados);
+      let salva;
+      if (existe.length) salva = await banco.atualizar("conexoes", existe[0].id, dados); else salva = await banco.inserir("conexoes", dados);
+      const org = await banco.obter("organizacoes", est.org_id);
+      if (org && !org.conta_padrao_id) await banco.atualizar("organizacoes", org.id, { conta_padrao_id: salva.id });
       return voltar("conectado");
     } catch (e) {
       return voltar("erro");
@@ -481,6 +489,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     exigir(ctx, PAPEIS_ADMIN);
     const c = await banco.obter("conexoes", id);
     if (!c || c.org_id !== ctx.org.id) falha(404, "conta_nao_encontrada", "Conta não encontrada.");
+    if (ctx.org.conta_padrao_id === id) await banco.atualizar("organizacoes", ctx.org.id, { conta_padrao_id: null });
     return { conexao: semSegredo(await banco.atualizar("conexoes", id, { estado: "revogada", token_cifrado: null, atualizado_em: agora() })) };
   };
 
@@ -495,7 +504,11 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
       const org = consulta.org_id || corpo.org_id;
       const ctx = () => contexto(usuario, org);
       let res;
+      const livre = r1 === "saude" || (r1 === "instagram" && r2 === "retorno") || r1 === "conta" || r1 === "admin";
+      if (!livre) await acesso.exigirLiberado(usuario);
       if (r1 === "saude") res = { ok: true, modo, versao_api: VERSAO_API, agora: agora() };
+      else if (r1 === "conta") res = await acesso.rotaConta(M, r2, corpo, usuario);
+      else if (r1 === "admin") res = await acesso.rotaAdmin(M, partes.slice(2), corpo, consulta, usuario);
       else if (r1 === "instagram" && r2 === "retorno" && M === "GET") res = await op.retornoInstagram(consulta);
       else if (r1 === "organizacoes" && M === "POST") res = await op.criarOrganizacao(usuario, corpo);
       else if (r1 === "eu" && M === "GET") res = await op.eu(await ctx());
@@ -516,12 +529,13 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
       else if (r1 === "frequencia" && !r2 && M === "PUT") res = await op.aplicarFrequencia(await ctx(), corpo.politica || {}, corpo.hash_previa);
       else if (r1 === "fila" && (r2 === "pausar" || r2 === "retomar") && M === "POST") res = await op.pausarFila(await ctx(), r2 === "pausar");
       else if (r1 === "comandos" && M === "POST") res = await op.comando(await ctx(), corpo);
-      else if (r1 === "instagram" && r2 === "conectar" && M === "POST") res = await op.conectarInstagram(await ctx());
+      else if (r1 === "instagram" && r2 === "conectar" && M === "POST") res = await op.conectarInstagram(await ctx(), corpo);
       else if (r1 === "instagram" && r3 === "desconectar" && M === "POST") res = await op.desconectarInstagram(await ctx(), r2);
       else falha(404, "rota", `Rota desconhecida: ${M} /${partes.join("/")}`);
       if (res && res.redirecionar) return { status: 302, corpo: null, redirecionar: res.redirecionar };
       return { status: 200, corpo: res };
     } catch (e) {
+      if (e instanceof ErroAcesso) return { status: e.status, corpo: { erro: e.codigo, mensagem: e.message, ...e.extra } };
       if (e instanceof ErroApi) return { status: e.status, corpo: { erro: e.codigo, mensagem: e.message, ...e.extra } };
       if (e instanceof ErroEstado) return { status: 409, corpo: { erro: e.codigo, mensagem: e.message } };
       if (e && e.codigo === "politica_invalida") return { status: 400, corpo: { erro: e.codigo, mensagem: e.message } };
@@ -529,5 +543,5 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     }
   }
 
-  return { tratar, op };
+  return { tratar, op, acesso };
 }

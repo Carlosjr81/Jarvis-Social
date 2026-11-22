@@ -9,6 +9,28 @@
   depois do passo 0 do `DEPLOY.md`). Agendar NÃO cria commit: é um pedido
   autenticado gravado no servidor e relido antes de confirmar.
 
+## Cadastro e usuários
+- Quem abre o painel cria a conta (nome, e-mail, senha) e espera a sua
+  liberação; a tela confere sozinha a cada 30 s. Depois aceita os termos.
+- Você (dono) vê no Início "N cadastros esperando" e "N pagamentos para
+  confirmar". Em Ajustes › Painel de usuários: liberar (sem prazo, 7, 30, 90
+  dias ou 1 ano), renovar, bloquear com motivo, recado, nota só sua,
+  cortesia, registrar pagamento recebido por fora, link de nova senha,
+  remover da lista, liberar todos, aprovação automática e planilha.
+- **Cobrança** (desligada até você ligar): planos mensal, anual, único e
+  vitalício com preço e dias editáveis, dias de teste, chave Pix. A pessoa
+  gera o Pix copia e cola com o código do pagamento; você confere o código no
+  extrato e toca Confirmar: o acesso soma os dias do plano. Não há renovação
+  automática nem aviso automático do banco (precisaria de um provedor de
+  pagamento, pago).
+- Bloqueado, vencido ou sem plano: o painel fecha e o servidor não publica
+  nada novo daquele espaço até liberar.
+
+## Contas do Instagram
+Conecte quantas quiser em Ajustes › Instagram e escolha a **padrão**. Cada
+Novo Reel vem com a padrão marcada em "Publicar em" e dá para trocar; a edição
+também troca. Na Agenda, filtre por conta.
+
 ## Comandos (caixa "Diga o que fazer" no Início, ou `POST /v1/comandos`)
 | Você diz | O que acontece |
 |---|---|
