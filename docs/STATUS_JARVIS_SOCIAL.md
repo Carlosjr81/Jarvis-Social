@@ -12,7 +12,7 @@
 | Etapa | A concluída (fundação) + B em parte (agendamento e adaptador Meta testados com simulador) + base comercial da E (cadastro com aprovação, termos, prazos, cobrança por Pix, painel do dono), 22/11/2026 |
 | Testes | `node testes/rodar.mjs` → 107 passou / 0 falhou (22/11/2026, sessão na nuvem; Actions confere a cada push) |
 | Painel publicado | Pages ligado pelo dono em 22/11/2026 (main, raiz): https://carlosjr81.github.io/Jarvis-Social/ — em DEMONSTRAÇÃO até o servidor existir. A sessão na nuvem não alcança github.io; abertura no celular a confirmar pelo dono |
-| Servidor (Supabase) | Projeto `jarvis-social` criado pelo dono (ref klbthlkalucoeoemipxm, sa-east-1). **Ainda não implantado**: falta o segredo `JS_SUPABASE_ACCESS_TOKEN` (passo 1). Ao chegar, o `relogio.yml` dispara a instalação sozinho em até 15 min |
+| Servidor (Supabase) | **No ar desde 22/11/2026 18:25** (run 45054841848): projeto `jarvis-social` (klbthlkalucoeoemipxm), banco migrado, funções api/worker/mcp, pg_cron, prova de vida ok (saúde, worker, MCP 401 sem chave). Token do dono no segredo `JS_SUPABASE_ACCESS_TOKEN` (vence ~20/12/2026: trocar antes, senão novas implantações falham) |
 | Instagram real | **Não conectado / nenhuma publicação real feita.** Depende do app da Meta (passo 2 do `DEPLOY.md`) |
 
 ## O que funciona hoje (provado por teste)
@@ -95,6 +95,7 @@
 3. ~~Ligar o GitHub Pages~~ feito em 22/11/2026.
 
 ## Próxima ação
+- Dono: Criar conta no painel (1ª confirmada = dona) › Conectar ChatGPT (OAuth) › app da Meta › conectar @carlos.jr.81. Primeira conexão real do ChatGPT ainda não testada.
 - Quando o dono colar o token (botões do painel), a instalação dispara sozinha
   pelo relógio; conferir o log do **Jarvis Social** a prova de vida, entrar no
   painel pelo celular e rodar o roteiro de aceite de `docs/OPERACAO.md`.
