@@ -49,6 +49,8 @@ function servir() {
   return new Promise((ok) => {
     const s = http.createServer((q, r) => {
       const u = decodeURIComponent(new URL(q.url, "http://x").pathname).replace(/^\/jarvis-social/, "");
+      // O config.js publicado aponta para o servidor real; o painel testado é a DEMONSTRAÇÃO.
+      if (u === "/config.js") { r.writeHead(200, { "Content-Type": "text/javascript" }); return r.end('export const CONFIG = { supabaseUrl: "", supabaseAnon: "" };'); }
       const f = path.join(RAIZ, u.endsWith("/") ? u + "index.html" : u);
       if (!f.startsWith(RAIZ) || !fs.existsSync(f)) { r.writeHead(404); return r.end(); }
       r.writeHead(200, { "Content-Type": TIPOS[path.extname(f)] || "application/octet-stream" }); fs.createReadStream(f).pipe(r);
