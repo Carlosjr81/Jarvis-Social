@@ -13,39 +13,41 @@ editam, pausam, cancelam e mudam a frequência (sempre com prévia). Vídeos
 novos entram pelo painel (Novo Reel › Salvar como rascunho, ou Biblioteca); o
 assistente programa o que já está lá.
 
-**Estado (22/11/2026): pronto no código e testado com o banco simulado (101
-testes). Não instalado nem testado no ChatGPT/Claude reais**: depende do
-servidor no ar (`docs/DEPLOY.md`: um segredo só).
+**Estado (22/11/2026): pronto no código e testado com o banco simulado (113
+testes, incluindo o login OAuth completo). Não testado no ChatGPT/Claude
+reais**: depende do servidor no ar (`docs/DEPLOY.md`: um segredo só).
 
-## 1. Criar a chave (no painel, uma vez por assistente)
-Ajustes › **Integrações: ChatGPT e Claude** › nome, escopo ("Ler e
-programar" ou "Só ler"), validade › **Criar chave**. Ela aparece **uma vez**
-com o endereço do conector. Vale só para o seu espaço; revogue quando quiser
-(efeito imediato). O servidor guarda só a impressão digital (SHA-256).
+## Conectar (como no Metricool: endereço + Permitir, sem copiar chave)
+Endereço do conector: `https://SEU_REF.supabase.co/functions/v1/mcp`
+(o painel copia sozinho em Início › Configuração › **Conectar ChatGPT/Claude**).
 
-## 2. Claude (claude.ai, celular ou computador)
-Configurações › **Conectores** › **Adicionar conector personalizado** › cole o
-endereço `https://SEU_REF.supabase.co/functions/v1/mcp/js_...` › Adicionar. Na
-conversa, ative o conector "jarvis-social" e peça, por exemplo:
-- "Mostre a grade de Reels da semana."
-- "Encaixe os rascunhos nos horários livres."
-- "Mude para dois por dia, às 10h e às 18h" (ele mostra a prévia e pede OK).
+**ChatGPT** (no navegador; o Modo desenvolvedor depende do plano):
+1. Configurações › **Apps e conectores** › Avançado › ligue o **Modo desenvolvedor**.
+2. **Criar**: Nome `Jarvis Social` · URL do servidor MCP: cole · Autenticação: **OAuth** › Criar.
+3. O ChatGPT abre o painel do Jarvis (`#autorizar/...`): entre e toque em **Permitir**
+   (ou "Permitir só ler"). Volta sozinho para o ChatGPT.
+4. Na conversa, escolha o Jarvis Social (＋ › Mais / Modo desenvolvedor) e peça.
 
-O endereço contém a chave: trate como senha. (Se a tela do Claude pedir OAuth,
-este conector ainda não tem; use o endereço com a chave.)
+**Claude**: Configurações › Conectores › Adicionar conector personalizado ›
+cole o endereço › Adicionar › **Conectar** › Permitir.
 
-## 3. ChatGPT
-**Opção A — GPT personalizado com Ações** (plano que permite criar GPTs):
+Como funciona: o servidor publica os metadados OAuth em
+`<endereço>/.well-known/oauth-protected-resource`, `.../oauth-authorization-server`
+e `.../openid-configuration`; o assistente se registra sozinho (`/oauth/register`),
+abre `/oauth/authorize` (PKCE S256), que manda para o painel, e troca o código
+em `/oauth/token`. O token é uma chave de integração comum (aparece em Ajustes ›
+Integrações como "ChatGPT (conectado)", revoga-se ali), vale 7 dias e renova
+sozinho por 180 dias. Código: `oauth.js`, `mcp-http.js`; testes: `teste-oauth.mjs`.
+
+**Sem OAuth** (cliente que só aceita "sem autenticação"): no mesmo botão,
+"Sem OAuth? Usar chave no endereço" gera `.../mcp/js_...` (trate como senha).
+
+**Plano do ChatGPT sem Modo desenvolvedor: GPT personalizado com Ações**:
 1. chatgpt.com › Explorar GPTs › **Criar** › Configurar.
 2. **Instruções**: cole o bloco abaixo.
-3. **Ações › Criar nova ação › Importar** o conteúdo de
-   `openapi-chatgpt.json` (o workflow de implantação já troca `SEU_REF` pelo
-   endereço real).
-4. **Autenticação › Chave de API › Bearer** › cole a chave `js_...`.
+3. **Ações › Criar nova ação › Importar de URL**: `https://carlosjr81.github.io/Jarvis-Social/openapi-chatgpt.json`.
+4. **Autenticação › Chave de API › Bearer** › a chave `js_...` (botão 4 do painel).
 5. Salve (privado: "Só eu").
-
-**Opção B — conector MCP** (quando o seu plano/modo do ChatGPT permitir
-conectores personalizados): use o mesmo endereço do Claude.
 
 Instruções para o GPT:
 ```
