@@ -159,8 +159,10 @@ if (pw) {
     const nav = await pw.chromium.launch();
     try {
       const pg = await (await nav.newContext({ viewport: { width: 360, height: 740 } })).newPage();
+      // O Chromium do Actions não toca H.264: segura o vídeo "carregando" para testar o Pular em qualquer navegador.
+      await pg.route("**/abertura-v2.mp4", () => {});
       await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);
-      await pg.locator("#abertura video[muted], #abertura video").first().waitFor();
+      await pg.locator("#abertura video").first().waitFor();
       igual(await pg.evaluate(() => document.querySelector("#abertura video").muted), true, "mudo");
       await pg.getByRole("button", { name: "Pular ›" }).click();
       await pg.getByText("Novo Reel").first().waitFor();
