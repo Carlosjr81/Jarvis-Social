@@ -30,7 +30,7 @@ teste(".nojekyll presente (o Pages ignoraria _compartilhado/ sem ele)", () => ve
 teste("todo módulo compartilhado importado está na casca do SW", () => {
   const sw = fs.readFileSync(path.join(RAIZ, "sw.js"), "utf8");
   const pasta = path.join(RAIZ, "supabase/functions/_compartilhado");
-  const SO_SERVIDOR = ["mcp.js", "servidor.js"]; // não rodam no navegador
+  const SO_SERVIDOR = ["mcp.js", "mcp-http.js", "servidor.js"]; // não rodam no navegador
   for (const f of fs.readdirSync(pasta).filter((x) => x.endsWith(".js") && !SO_SERVIDOR.includes(x))) verdade(sw.includes("_compartilhado/" + f), "falta no sw.js: " + f);
 });
 teste("todo arquivo da casca do SW existe", () => {
@@ -146,7 +146,7 @@ if (pw) {
       await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#ajustes`);
       await pg.getByRole("button", { name: "Conectar Claude (1 toque)" }).click();
       await pg.getByRole("heading", { name: "Conectar o Claude" }).waitFor();
-      verdade((await pg.locator("#folha-conteudo [data-copiar]").first().getAttribute("data-copiar")).includes("/functions/v1/mcp/js_"));
+      verdade((await pg.locator("#folha-conteudo [data-copiar]").first().getAttribute("data-copiar")).endsWith("/functions/v1/mcp"), "OAuth: só o endereço, sem chave");
       await pg.click("#ia-fechar");
       // Lançar propaganda (demonstração): escolhe o vídeo, legenda pronta, publica agora.
       await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#inicio`);

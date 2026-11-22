@@ -13,7 +13,7 @@ export function ambiente({ agora = "2026-11-22T15:00:00.000Z", falhas = {}, esta
   const banco = new BancoMemoria(estado);
   const arm = new ArmazenamentoMemoria();
   const ig = criarInstagramSimulado({ falhas, agora: relogio });
-  const segredos = { urlPainel: "https://painel.exemplo/", appId: "1", appSecret: "s", redirectUri: "https://x/retorno", chaveCifra: btoa(String.fromCharCode(...new Uint8Array(32).fill(7))), emailsDono };
+  const segredos = { urlPainel: "https://painel.exemplo/", baseMcp: "https://ref.supabase.co/functions/v1/mcp", appId: "1", appSecret: "s", redirectUri: "https://x/retorno", chaveCifra: btoa(String.fromCharCode(...new Uint8Array(32).fill(7))), emailsDono };
   const links = [], apagados = [];
   const autenticacao = { enviarLinkSenha: async (e) => links.push(e), apagarUsuario: async (id) => apagados.push(id) };
   const api = criarApi({ banco, armazenamento: arm, instagram: ig, agora: relogio, segredos, autenticacao, buscar });

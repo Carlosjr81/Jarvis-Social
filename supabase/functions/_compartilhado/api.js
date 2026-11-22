@@ -13,6 +13,7 @@ import { ErroBanco } from "./banco.js";
 import { cifrar, sha256Hex } from "./cifra.js";
 import { criarAcesso, ErroAcesso } from "./api-acesso.js";
 import { baixar, ErroImportar } from "./importar.js";
+import { criarOAuth, ErroOAuth } from "./oauth.js";
 
 export const VERSAO_API = "2026-11-22a";
 const PAPEIS_EDICAO = ["dono", "admin", "editor"];
@@ -616,6 +617,9 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     return { id: k.usuario_id, email: conta ? conta.email : "", email_confirmado: true, via_token: true, escopos: k.escopos || [], org_token: k.org_id, chave_id: k.id };
   }
 
+  // OAuth do conector MCP (ChatGPT/Claude conectam como no Metricool): oauth.js.
+  const oauth = criarOAuth({ banco, agora, base: segredos.baseMcp || "", urlPainel: segredos.urlPainel, buscar });
+
   async function tratar({ metodo, caminho, consulta = {}, corpo = {}, usuario = null, token = null }) {
     try {
       if (token && !usuario) usuario = await usuarioDaChave(token);
@@ -663,6 +667,9 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
       else if (r1 === "chaves" && !r2 && M === "GET") res = await op.listarChaves(await ctx());
       else if (r1 === "chaves" && !r2 && M === "POST") res = await op.criarChave(await ctx(), corpo);
       else if (r1 === "chaves" && r3 === "revogar" && M === "POST") res = await op.revogarChave(await ctx(), r2);
+      else if (r1 === "oauth" && r2 === "pedidos" && r3 && !partes[4] && M === "GET") res = (await ctx(), await oauth.verPedido(r3));
+      else if (r1 === "oauth" && r2 === "pedidos" && r3 && partes[4] === "aprovar" && M === "POST") { const c = await ctx(); exigir(c, PAPEIS_EDICAO); res = await oauth.aprovar(c, r3, corpo); }
+      else if (r1 === "oauth" && r2 === "pedidos" && r3 && partes[4] === "negar" && M === "POST") { await ctx(); res = await oauth.negar(r3); }
       else if (r1 === "worker" && r2 === "cutucar" && M === "POST") res = await op.cutucar(await ctx());
       else if (r1 === "comandos" && M === "POST") res = await op.comando(await ctx(), corpo);
       else if (r1 === "instagram" && r2 === "conectar" && M === "POST") res = await op.conectarInstagram(await ctx(), corpo);
@@ -671,6 +678,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
       if (res && res.redirecionar) return { status: 302, corpo: null, redirecionar: res.redirecionar };
       return { status: 200, corpo: res };
     } catch (e) {
+      if (e instanceof ErroOAuth) return { status: e.status, corpo: { erro: e.erro, mensagem: e.message } };
       if (e instanceof ErroAcesso) return { status: e.status, corpo: { erro: e.codigo, mensagem: e.message, ...e.extra } };
       if (e instanceof ErroApi) return { status: e.status, corpo: { erro: e.codigo, mensagem: e.message, ...e.extra } };
       if (e instanceof ErroEstado) return { status: 409, corpo: { erro: e.codigo, mensagem: e.message } };
@@ -679,5 +687,5 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     }
   }
 
-  return { tratar, op, acesso };
+  return { tratar, op, acesso, oauth };
 }

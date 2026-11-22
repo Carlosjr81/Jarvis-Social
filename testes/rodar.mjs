@@ -9,6 +9,7 @@ const SUITES = [
   ["teste-api", "agendamento, isolamento, idempotência, frequência, comandos, OAuth"],
   ["teste-acesso", "cadastro com aprovação, termos, prazos, cobrança Pix, painel do dono, contas"],
   ["teste-integracao", "chaves, grade de publicação e conector MCP (ChatGPT e Claude)"],
+  ["teste-oauth", "conector OAuth: ChatGPT e Claude conectam como no Metricool"],
   ["teste-worker", "publicação, reconciliação, falhas, lease, atraso"],
   ["teste-sql", "migração e fila no PostgreSQL real"],
   ["teste-web", "painel: sintaxe, PWA, demonstração rotulada"],

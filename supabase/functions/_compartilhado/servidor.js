@@ -15,7 +15,7 @@ export function criarApiDoServidor(env, f = globalThis.fetch) {
     segredos: {
       appId: env("JS_META_APP_ID"), appSecret: env("JS_META_APP_SECRET"),
       redirectUri: `${URL_SB}/functions/v1/api/v1/instagram/retorno`,
-      chaveCifra: env("JS_CHAVE_CIFRA"), urlPainel: env("JS_URL_PAINEL"), emailsDono: lista("JS_EMAIL_DONO"),
+      chaveCifra: env("JS_CHAVE_CIFRA"), urlPainel: env("JS_URL_PAINEL"), baseMcp: `${URL_SB}/functions/v1/mcp`, emailsDono: lista("JS_EMAIL_DONO"),
     },
     limites: { videoBytes: Number(env("JS_LIMITE_VIDEO_MB") || 50) * 1048576 },
     // "Teste de publicação imediato": acorda a função worker com o segredo dela.

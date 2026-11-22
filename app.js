@@ -14,7 +14,7 @@ import { formatarLocal, partesLocais, somarDias, NOMES_DIA_LONGO, FUSO_PADRAO } 
 import { AJUDA } from "./supabase/functions/_compartilhado/comandos.js";
 import { sugerirEmail, PRAZOS_ACESSO, NOMES_SITUACAO } from "./supabase/functions/_compartilhado/acesso.js";
 
-export const VERSAO_PAINEL = "2026-11-22k";
+export const VERSAO_PAINEL = "2026-11-22l";
 const CH = { sessao: "jarvis-social:sessao", demo: "jarvis-social:demo", modo: "jarvis-social:modo", rascunho: "jarvis-social:rascunho", email: "jarvis-social:email" };
 const ls = {
   ler(k, padrao = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch { return padrao; } },
@@ -878,27 +878,49 @@ async function aplicarPredefinicao(pr, alvo) {
 
 // Conectar um assistente com o mínimo de toques.
 async function conectarIA(qual) {
-  const r = await cli.chamar("POST", "/v1/chaves", { nome: qual === "claude" ? "Claude" : "ChatGPT", escopo: "programar", dias: 365 });
+  // Como o Metricool: só o endereço do MCP. O assistente pede login sozinho
+  // (OAuth), abre esta página em #autorizar e você toca em Permitir.
   const base = CONFIG.supabaseUrl ? CONFIG.supabaseUrl.replace(/\/$/, "") : "https://SEU_REF.supabase.co";
-  const mcp = base + "/functions/v1/mcp/" + r.segredo;
+  const mcp = base + "/functions/v1/mcp";
+  try { await navigator.clipboard.writeText(mcp); } catch {}
+  const demo = cli.modo === "demonstracao" ? `<p class="fraco">Demonstração: o conector funciona depois que o servidor estiver no ar.</p>` : "";
+  const grande = (href, txt) => `<a class="botao primario grande" href="${href}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;text-decoration:none">${txt}</a>`;
+  const reserva = `<details style="margin-top:12px"><summary>Sem OAuth? Usar chave no endereço</summary>
+      <p class="fraco">Para clientes que só aceitam "sem autenticação". A chave vale 1 ano e aparece em Ajustes › Integrações, onde se revoga.</p>
+      <button id="ia-chave">Criar chave e copiar o endereço com ela</button><div id="ia-chave-msg"></div></details>`;
   if (qual === "claude") {
-    try { await navigator.clipboard.writeText(mcp); } catch {}
     abrirFolha(`<h2>Conectar o Claude</h2><div class="faixa ok">Endereço copiado ✓</div>
-      <p>Na tela que vai abrir: <strong>Adicionar conector personalizado</strong> › colar › Adicionar. Na conversa, peça "mostre a grade de Reels".</p>
-      <a class="botao primario grande" href="https://claude.ai/settings/connectors" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;text-decoration:none">Abrir Conectores do Claude</a>
+      <p>1. Na tela que vai abrir: <strong>Adicionar conector personalizado</strong> › Nome <strong>Jarvis Social</strong> › cole o endereço › <strong>Adicionar</strong>.</p>
+      <p>2. Toque em <strong>Conectar</strong>: o Jarvis abre, você toca em <strong>Permitir</strong> e volta para o Claude.</p>
+      ${grande("https://claude.ai/settings/connectors", "Abrir Conectores do Claude")}
       <button data-copiar="${esc(mcp)}" style="width:100%;margin-top:8px">Copiar o endereço de novo</button>
-      ${cli.modo === "demonstracao" ? `<p class="fraco">Demonstração: o conector funciona depois que o servidor estiver no ar.</p>` : ""}
+      <p class="fraco">Na conversa: "mostre a grade de Reels", "programe este vídeo amanhã às 10h".</p>${demo}${reserva}
       <button class="grande" id="ia-fechar" style="margin-top:8px">Fechar</button>`);
   } else {
     const contrato = new URL("openapi-chatgpt.json", location.href.split("#")[0]).toString();
-    abrirFolha(`<h2>Conectar o ChatGPT</h2><p>Abra o criador de GPT e toque nos botões na ordem, colando cada um no lugar indicado:</p>
-      <a class="botao primario grande" href="https://chatgpt.com/gpts/editor" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;text-decoration:none">1. Abrir o criador de GPT</a>
-      <button class="grande" data-copiar="${esc(INSTRUCOES_GPT)}" style="margin-top:8px">2. Copiar instruções › cole em "Instruções"</button>
-      <button class="grande" data-copiar="${esc(contrato)}" style="margin-top:8px">3. Copiar link › Ações › "Importar de URL"</button>
-      <button class="grande" data-copiar="${esc(r.segredo)}" style="margin-top:8px">4. Copiar chave › Autenticação › Chave de API › Bearer</button>
-      <p class="fraco">5. Salvar (Só eu). Se o seu ChatGPT aceitar conectores MCP: <button data-copiar="${esc(mcp)}">Copiar endereço MCP</button></p>
+    abrirFolha(`<h2>Conectar o ChatGPT</h2><div class="faixa ok">Endereço copiado ✓</div>
+      <p>Igual ao Metricool: um conector MCP com login. No ChatGPT (no navegador):</p>
+      <p>1. <strong>Configurações › Apps e conectores › Avançado</strong> › ligue o <strong>Modo desenvolvedor</strong>.</p>
+      <p>2. <strong>Criar</strong> (novo app/conector): Nome <strong>Jarvis Social</strong> · URL do servidor MCP: <strong>cole</strong> · Autenticação: <strong>OAuth</strong> · marque "confio neste app" › <strong>Criar</strong>.</p>
+      <p>3. O ChatGPT abre o Jarvis: toque em <strong>Permitir</strong>. Pronto: os comandos da conversa chegam aqui pelo MCP.</p>
+      ${grande("https://chatgpt.com/#settings/Connectors", "Abrir as configurações do ChatGPT")}
+      <button data-copiar="${esc(mcp)}" style="width:100%;margin-top:8px">Copiar o endereço de novo</button>
+      <p class="fraco">Na conversa, escolha o Jarvis Social em ＋ › Mais (ou Modo desenvolvedor) e peça: "mostre minha agenda da semana". Os nomes dos menus mudam com as versões do ChatGPT; o Modo desenvolvedor depende do plano.</p>${demo}${reserva}
+      <details style="margin-top:8px"><summary>Plano sem Modo desenvolvedor: GPT personalizado (Ações)</summary>
+        ${grande("https://chatgpt.com/gpts/editor", "1. Abrir o criador de GPT")}
+        <button class="grande" data-copiar="${esc(INSTRUCOES_GPT)}" style="margin-top:8px">2. Copiar instruções › "Instruções"</button>
+        <button class="grande" data-copiar="${esc(contrato)}" style="margin-top:8px">3. Copiar link › Ações › "Importar de URL"</button>
+        <button class="grande" id="ia-chave-gpt" style="margin-top:8px">4. Criar e copiar chave › Autenticação › Chave de API › Bearer</button>
+      </details>
       <button class="grande" id="ia-fechar" style="margin-top:8px">Fechar</button>`);
   }
+  const criarChave = async () => (await cli.chamar("POST", "/v1/chaves", { nome: qual === "claude" ? "Claude" : "ChatGPT", escopo: "programar", dias: 365 })).segredo;
+  $("#ia-chave").onclick = async () => {
+    try { const k = await criarChave(); const u = mcp + "/" + k; try { await navigator.clipboard.writeText(u); } catch {}
+      $("#ia-chave-msg").innerHTML = `<div class="faixa ok">Copiado ✓ (só aparece agora)</div><textarea readonly style="min-height:60px">${esc(u)}</textarea>`; }
+    catch (err) { $("#ia-chave-msg").innerHTML = `<div class="faixa erro">${mensagemErro(err)}</div>`; }
+  };
+  $("#ia-chave-gpt") && ($("#ia-chave-gpt").onclick = async (ev) => { try { const k = await criarChave(); try { await navigator.clipboard.writeText(k); } catch {} ev.target.textContent = "Chave copiada ✓ (só aparece agora)"; } catch (err) { alert(err.message); } });
   $("#ia-fechar").onclick = () => { fecharFolha(); mostrar(); };
 }
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-conectar-ia]"); if (b) conectarIA(b.dataset.conectarIa).catch((err) => alert(err.message)); });
@@ -1071,6 +1093,30 @@ function gerirConta(c, cfg, aoMudar) {
   }));
 }
 
+// "Permitir" do conector (ChatGPT/Claude por OAuth, como no Metricool). O
+// assistente manda para cá (#autorizar/<pedido>) depois de passar pelo porteiro.
+telas.autorizar = async (el, id) => {
+  let p;
+  try { p = (await cli.chamar("GET", `/v1/oauth/pedidos/${encodeURIComponent(id)}`)).pedido; }
+  catch (err) { el.innerHTML = `<h1>Conectar assistente</h1><div class="faixa erro">${mensagemErro(err)}</div><a class="botao" href="#inicio">Voltar ao início</a>`; return; }
+  const programa = p.escopos.includes("programar");
+  el.innerHTML = `<h1>Conectar ${esc(p.cliente)}</h1>
+    <div class="cartao"><p><strong>${esc(p.cliente)}</strong> (${esc(p.destino)}) quer acessar o seu Jarvis Social${eu && eu.org ? ` — espaço <strong>${esc(eu.org.nome)}</strong>` : ""}:</p>
+      <p>✅ ver a agenda, a grade e a biblioteca</p>${programa ? `<p>✅ criar, programar, editar, pausar e cancelar Reels pelos seus pedidos na conversa</p>` : ""}
+      <p class="fraco">Não vê sua senha nem o token do Instagram. Revogue quando quiser em Ajustes › Integrações.</p></div>
+    <button class="primario grande" id="oa-permitir" style="width:100%">Permitir</button>
+    ${programa ? `<button class="grande" id="oa-ler" style="width:100%;margin-top:8px">Permitir só ler</button>` : ""}
+    <button class="grande" id="oa-negar" style="width:100%;margin-top:8px">Negar</button><div id="oa-msg"></div>`;
+  const ir = async (caminho, corpo) => {
+    el.querySelectorAll("button").forEach((b) => (b.disabled = true));
+    try { const r = await cli.chamar("POST", `/v1/oauth/pedidos/${encodeURIComponent(id)}/${caminho}`, corpo || {}); $("#oa-msg").innerHTML = `<div class="faixa ok">Voltando para ${esc(p.cliente)}…</div>`; location.href = r.redirecionar_para; }
+    catch (err) { $("#oa-msg").innerHTML = `<div class="faixa erro">${mensagemErro(err)}</div>`; }
+  };
+  $("#oa-permitir").onclick = () => ir("aprovar");
+  $("#oa-ler") && ($("#oa-ler").onclick = () => ir("aprovar", { escopo: "leitura" }));
+  $("#oa-negar").onclick = () => ir("negar");
+};
+
 // ------------------------------------------------------------------ roteamento
 async function mostrar() {
   const el = $("#tela");
@@ -1078,7 +1124,8 @@ async function mostrar() {
   const aba = ["inicio", "criar", "agenda", "biblioteca", "ajustes"].includes(rota) ? rota : rota === "post" ? "agenda" : ["usuarios", "planos"].includes(rota) ? "ajustes" : "inicio";
   document.querySelectorAll("nav.barra a").forEach((a) => { const at = a.dataset.aba === aba; a.classList.toggle("ativo", at); at ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"); });
   try {
-    if (rota === "post" && arg) await telas.post(el, arg);
+    if (rota === "autorizar" && arg) await telas.autorizar(el, arg);
+    else if (rota === "post" && arg) await telas.post(el, arg);
     else if (rota === "usuarios" && contaEstado && contaEstado.dono) await telas.usuarios(el);
     else if (rota === "planos") await telas.planos(el, contaEstado, { dentro: true });
     else await telas[aba](el);
