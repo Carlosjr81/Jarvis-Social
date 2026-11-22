@@ -84,7 +84,10 @@
 - Dono automático (1ª conta confirmada; `JS_EMAIL_DONO` opcional).
 - App da Meta pelo painel (Ajustes › Instagram; segredo cifrado no banco).
 - Piloto automático por espaço (worker preenche a grade com rascunhos).
-- Início: lista "Configuração: N de 6"; Integrações com botões de copiar.
+- Início: lista "Configuração: N de 6" em que cada item é um botão que faz
+  a ação; "Conectar Claude/ChatGPT" de 1 toque; frequência por predefinição;
+  espaço criado sozinho; piloto ligado de fábrica; "Salvar como rascunho"
+  segura o post (`posts.segurar`) para o piloto não programar.
 
 ## Bloqueios (só o dono resolve)
 1. Conta grátis no Supabase + **um** segredo no GitHub (`JS_SUPABASE_ACCESS_TOKEN`) — `docs/DEPLOY.md`, passo 1.

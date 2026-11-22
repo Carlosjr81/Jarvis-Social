@@ -34,18 +34,20 @@ os links, o endereço de redirecionamento com botão de copiar e os dois
 campos (ID do app e chave secreta). Salvar já abre a autorização do
 Instagram. A chave secreta fica cifrada no servidor.
 
-## Passo 4 — ChatGPT e Claude (2 min cada)
-**Ajustes › Integrações › Criar chave** e use os botões:
-- Claude: **Copiar p/ Claude** › **Abrir Conectores do Claude** › Adicionar
-  conector personalizado › colar.
-- ChatGPT: **Criar GPT** › Instruções (**Copiar instruções do GPT**) › Ações
-  › Importar de URL (**Copiar link do contrato**) › Autenticação Bearer
-  (**Copiar chave p/ GPT**).
+## Passo 4 — ChatGPT e Claude (1 toque cada)
+- **Conectar Claude**: cria a chave, copia o endereço e abre os Conectores do
+  Claude: lá é só "Adicionar conector personalizado" › colar.
+- **Conectar ChatGPT**: abre o criador de GPT e mostra 3 botões de copiar,
+  na ordem (instruções, link do contrato, chave).
 
-## Passo 5 — piloto automático (1 toque)
-**Ajustes › Frequência**: escolha os horários e ligue **Piloto
-automático**. Daí em diante, todo rascunho (seu, do ChatGPT ou do Claude)
-entra sozinho no próximo horário livre, e o servidor publica.
+## Já automático (nada a fazer)
+- O espaço é criado sozinho (nome da conta, fuso do celular).
+- **Piloto automático já vem ligado**: todo rascunho do ChatGPT ou do Claude
+  (e os do painel enviados "para a fila") entra no próximo horário livre e o
+  servidor publica. "Salvar como rascunho" no painel **segura** o post.
+- Frequência em um toque (Ajustes › Frequência › 1, 2 ou 3 por dia, dias
+  úteis). A prévia só aparece se mexer em post já programado.
+- A primeira conta do Instagram conectada vira a padrão.
 
 A lista **Configuração: N de 6** no Início mostra o que falta, com o atalho
 de cada item.

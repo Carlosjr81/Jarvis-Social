@@ -28,3 +28,7 @@ alter table midias add column origem_url text;
 alter table config_plataforma add column dono_email text, add column dono_desde timestamptz,
   add column meta_app_id text, add column meta_app_secret_cifrado text;
 alter table organizacoes add column piloto_automatico boolean not null default false;
+
+-- Rascunho "segurado" (Salvar como rascunho no painel): o piloto automático não programa.
+alter table posts add column segurar boolean not null default false;
+alter table organizacoes alter column piloto_automatico set default true;

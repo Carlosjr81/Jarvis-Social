@@ -188,7 +188,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     if (!fusoValido(fuso)) falha(400, "fuso_invalido", "Fuso desconhecido.");
     const org = await banco.inserir("organizacoes", {
       nome: String(corpo.nome || "Meu espaço").slice(0, 80), fuso, fila_pausada: false, politica: politicaPadrao(fuso),
-      politica_atraso: "aguardar", tolerancia_atraso_min: 60, exige_aprovacao: false, criado_em: agora(), criado_por: usuario.id,
+      politica_atraso: "aguardar", tolerancia_atraso_min: 60, exige_aprovacao: false, piloto_automatico: corpo.piloto_automatico !== false, criado_em: agora(), criado_por: usuario.id,
     });
     await banco.inserir("membros", { org_id: org.id, usuario_id: usuario.id, papel: "dono", criado_em: agora() });
     return { org };
@@ -267,7 +267,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
         org_id: ctx.org.id, conta_id: conta ? conta.id : null, video_id: video.id, capa_id: capa ? capa.id : null,
         legenda: pedido.legenda, ...horario, estado: pedido.agendar ? "scheduled" : "draft", versao: 1,
         chave_idempotencia: c.chave_idempotencia, hash_pedido: hash, container_id: null, media_id: null, permalink: null,
-        publicado_em: null, tentativas: 0, ultimo_erro: null, fonte: c.fonte || null, simulado: demonstracao, teste: !!c.teste,
+        publicado_em: null, tentativas: 0, ultimo_erro: null, fonte: c.fonte || null, simulado: demonstracao, teste: !!c.teste, segurar: !pedido.agendar && !!c.segurar,
         criado_por: ctx.usuario.id, criado_em: agoraIso, atualizado_em: agoraIso,
       });
     } catch (e) {
@@ -498,7 +498,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     const resumo = (p) => p && { id: p.id, estado: p.estado, estado_texto: ESTADOS[p.estado], legenda: (p.legenda || "").slice(0, 80), conta_id: p.conta_id };
     const grade = slots.map((u) => ({ utc: u, ...utcParaLocal(u, fuso), post: resumo(porHora.get(u)) || null }));
     const foraDaGrade = posts.filter((p) => !slots.includes(new Date(p.agendado_utc).toISOString())).map((p) => ({ utc: p.agendado_utc, ...utcParaLocal(p.agendado_utc, fuso), post: resumo(p) }));
-    const rascunhos = (await banco.listar("posts", { org_id: ctx.org.id, estado: "draft" })).length;
+    const rascunhos = (await banco.listar("posts", { org_id: ctx.org.id, estado: "draft" })).filter((p) => !p.segurar).length;
     return { fuso, politica: pol, dias, livres: grade.filter((g) => !g.post).length, ocupados: grade.filter((g) => g.post).length, rascunhos_esperando: rascunhos, fila_pausada: !!ctx.org.fila_pausada, grade, fora_da_grade: foraDaGrade };
   };
   // Encaixa rascunhos (com vídeo) nos próximos horários livres, na ordem em que foram criados.
@@ -506,6 +506,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     exigir(ctx, PAPEIS_EDICAO);
     let lista = await banco.listar("posts", { org_id: ctx.org.id, estado: "draft" }, { ordem: "criado_em" });
     if (Array.isArray(c.post_ids) && c.post_ids.length) lista = c.post_ids.map((id) => lista.find((p) => p.id === id)).filter(Boolean);
+    else lista = lista.filter((p) => !p.segurar); // rascunho "segurado" só entra quando pedido pelo id
     lista = lista.filter((p) => p.video_id).slice(0, Math.max(1, Math.min(50, +c.limite || 50)));
     const feitos = [], erros = [];
     for (const p of lista) {

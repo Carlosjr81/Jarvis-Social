@@ -255,7 +255,7 @@ export function criarWorker({ banco, armazenamento, instagram, agora = () => new
       try {
         for (const org of await banco.listar("organizacoes", { piloto_automatico: true })) {
           if (org.fila_pausada) continue;
-          const rasc = await banco.listar("posts", { org_id: org.id, estado: "draft" }, { limite: 1 });
+          const rasc = (await banco.listar("posts", { org_id: org.id, estado: "draft" })).filter((p) => !p.segurar && p.video_id);
           if (!rasc.length) continue;
           const [donoOrg] = await banco.listar("membros", { org_id: org.id, papel: "dono" });
           if (!donoOrg || !(await acesso.orgComAcesso(org.id))) continue;

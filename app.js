@@ -14,7 +14,7 @@ import { formatarLocal, partesLocais, somarDias, NOMES_DIA_LONGO, FUSO_PADRAO } 
 import { AJUDA } from "./supabase/functions/_compartilhado/comandos.js";
 import { sugerirEmail, PRAZOS_ACESSO, NOMES_SITUACAO } from "./supabase/functions/_compartilhado/acesso.js";
 
-export const VERSAO_PAINEL = "2026-11-22i";
+export const VERSAO_PAINEL = "2026-11-22j";
 const CH = { sessao: "jarvis-social:sessao", demo: "jarvis-social:demo", modo: "jarvis-social:modo", rascunho: "jarvis-social:rascunho", email: "jarvis-social:email" };
 const ls = {
   ler(k, padrao = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch { return padrao; } },
@@ -549,7 +549,7 @@ async function enviarRascunho(agendar) {
     // voltou do segundo plano) devolve o mesmo post em vez de duplicar.
     const fonte = R.fonte.autor || R.fonte.url ? R.fonte : undefined;
     const contaEscolhida = ($("#in-conta") && $("#in-conta").value) || undefined;
-    const pedido = { video_id: R.videoMidia, capa_id: R.capaMidia || undefined, conta_id: contaEscolhida, legenda: R.legenda, agendar, chave_idempotencia: R.chave + (agendar ? ":a" : ":r"), fonte,
+    const pedido = { video_id: R.videoMidia, capa_id: R.capaMidia || undefined, conta_id: contaEscolhida, legenda: R.legenda, agendar, segurar: !agendar, chave_idempotencia: R.chave + (agendar ? ":a" : ":r"), fonte,
       ...(agendar ? (R.proximoLivre ? { proximo_livre: true } : { data: R.data, hora: R.hora }) : {}) };
     const { post } = await cli.chamar("POST", "/v1/posts", pedido);
     // Só confirma depois de LER de volta o que ficou gravado no servidor.
@@ -639,11 +639,14 @@ telas.ajustes = async (el) => {
       <div class="linha"><input id="chave-nome" placeholder="Nome (ex.: Claude)" style="flex:1 1 100%">
         <select id="chave-escopo" style="flex:1"><option value="programar">Ler e programar</option><option value="leitura">Só ler</option></select>
         <select id="chave-dias" style="flex:1"><option value="90">90 dias</option><option value="30">30 dias</option><option value="365">1 ano</option></select></div>
-      <button class="primario" id="criar-chave" style="width:100%;margin-top:8px">Criar chave</button>
+      <div class="linha"><button class="primario" data-conectar-ia="claude">Conectar Claude (1 toque)</button><button class="primario" data-conectar-ia="chatgpt">Conectar ChatGPT</button></div>
+      <details><summary class="fraco">Chave manual (outros assistentes)</summary>
+      <button id="criar-chave" style="width:100%;margin-top:8px">Criar chave</button></details>
       <div id="chave-nova"></div>
       <p class="fraco">Passo a passo para conectar: docs/INTEGRACAO-ASSISTENTES.md.</p></div>
     <div class="cartao"><h2>Frequência</h2>
       <p class="fraco">Sem limite do Jarvis: quantos horários quiser por dia. A cota oficial do Instagram é consultada antes de cada envio.</p>
+      <label>Um toque</label><div class="chips">${PREDEFINICOES.map((pr, k) => `<button class="chip" data-pre="${k}">${esc(pr.nome)}</button>`).join("")}</div><div id="pre-msg"></div>
       <label>Horários</label><div class="chips" id="horarios">${pol.horarios.map((h) => `<button class="chip ativo" data-tirar="${h}" aria-label="Remover ${h}">${h} ✕</button>`).join("")}</div>
       <div class="linha"><input id="nova-hora" type="time" style="flex:1"><button id="add-hora">Adicionar</button></div>
       <label>Dias</label><div class="chips">${[1, 2, 3, 4, 5, 6, 7].map((d) => `<label class="chip" style="display:flex;gap:6px;align-items:center;margin:0"><input type="checkbox" data-dia="${d}" ${pol.dias.includes(d) ? "checked" : ""}>${NOMES_DIA_LONGO[d].slice(0, 3)}</label>`).join("")}</div>
@@ -668,6 +671,7 @@ telas.ajustes = async (el) => {
       <p class="fraco">Painel ${VERSAO_PAINEL} · API ${esc(eu.versao_api)}</p></div>`;
   $("#atraso").value = eu.org.politica_atraso;
   desenharChaves();
+  el.querySelectorAll("[data-pre]").forEach((b) => (b.onclick = () => aplicarPredefinicao(PREDEFINICOES[+b.dataset.pre], $("#pre-msg"))));
   $("#piloto").onchange = async (e) => { try { await cli.chamar("PUT", "/v1/organizacao", { piloto_automatico: e.target.checked }); eu = await cli.chamar("GET", "/v1/eu"); } catch (err) { alert(err.message); e.target.checked = !e.target.checked; } };
   $("#criar-chave").onclick = async () => {
     try {
@@ -681,6 +685,7 @@ telas.ajustes = async (el) => {
           <button data-copiar="${esc(new URL("openapi-chatgpt.json", location.href.split("#")[0]).toString())}">Copiar link do contrato (Ações)</button><a class="botao" href="https://chatgpt.com/gpts/editor" target="_blank" rel="noopener">Criar GPT</a></div>
         ${cli.modo === "demonstracao" ? "<p>Demonstração: a chave só existe neste aparelho; o conector funciona depois que o servidor estiver no ar.</p>" : ""}</div>`;
       desenharChaves();
+  el.querySelectorAll("[data-pre]").forEach((b) => (b.onclick = () => aplicarPredefinicao(PREDEFINICOES[+b.dataset.pre], $("#pre-msg"))));
   $("#piloto").onchange = async (e) => { try { await cli.chamar("PUT", "/v1/organizacao", { piloto_automatico: e.target.checked }); eu = await cli.chamar("GET", "/v1/eu"); } catch (err) { alert(err.message); e.target.checked = !e.target.checked; } };
     } catch (err) { alert(err.message); }
   };
@@ -853,23 +858,82 @@ document.addEventListener("click", async (e) => {
   catch { prompt("Copie:", b.dataset.copiar); }
 });
 
+// Frequência em um toque: aplica direto se nada já programado muda; senão, prévia com um botão.
+const PREDEFINICOES = [
+  { nome: "1 por dia · 10h", horarios: ["10:00"], dias: [1, 2, 3, 4, 5, 6, 7] },
+  { nome: "2 por dia · 10h e 18h", horarios: ["10:00", "18:00"], dias: [1, 2, 3, 4, 5, 6, 7] },
+  { nome: "3 por dia · 9h, 13h e 19h", horarios: ["09:00", "13:00", "19:00"], dias: [1, 2, 3, 4, 5, 6, 7] },
+  { nome: "Dias úteis · 12h", horarios: ["12:00"], dias: [1, 2, 3, 4, 5] },
+];
+async function aplicarPredefinicao(pr, alvo) {
+  try {
+    const politica = { horarios: pr.horarios, dias: pr.dias, fuso: eu.org.fuso };
+    const pv = await cli.chamar("POST", "/v1/frequencia/previa", { politica });
+    const aplicar = async () => { await cli.chamar("PUT", "/v1/frequencia", { politica: pv.politica, hash_previa: pv.hash_previa }); eu = await cli.chamar("GET", "/v1/eu"); alvo.innerHTML = `<div class="faixa ok">Frequência: ${esc(pr.nome)} ✓</div>`; };
+    if (!pv.mudancas.length) { await aplicar(); return setTimeout(mostrar, 900); }
+    alvo.innerHTML = `<div class="faixa">${esc(pr.nome)} remarca ${pv.mudancas.length} publicação(ões):<ul>${pv.mudancas.slice(0, 6).map((m) => `<li>${esc(m.de_local)} → ${esc(m.para_local || "sem horário")}</li>`).join("")}</ul><button class="primario" id="pre-ok" style="width:100%">Aplicar</button></div>`;
+    $("#pre-ok").onclick = async () => { await aplicar(); setTimeout(mostrar, 900); };
+  } catch (err) { alvo.innerHTML = `<div class="faixa erro">${mensagemErro(err)}</div>`; }
+}
+
+// Conectar um assistente com o mínimo de toques.
+async function conectarIA(qual) {
+  const r = await cli.chamar("POST", "/v1/chaves", { nome: qual === "claude" ? "Claude" : "ChatGPT", escopo: "programar", dias: 365 });
+  const base = CONFIG.supabaseUrl ? CONFIG.supabaseUrl.replace(/\/$/, "") : "https://SEU_REF.supabase.co";
+  const mcp = base + "/functions/v1/mcp/" + r.segredo;
+  if (qual === "claude") {
+    try { await navigator.clipboard.writeText(mcp); } catch {}
+    abrirFolha(`<h2>Conectar o Claude</h2><div class="faixa ok">Endereço copiado ✓</div>
+      <p>Na tela que vai abrir: <strong>Adicionar conector personalizado</strong> › colar › Adicionar. Na conversa, peça "mostre a grade de Reels".</p>
+      <a class="botao primario grande" href="https://claude.ai/settings/connectors" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;text-decoration:none">Abrir Conectores do Claude</a>
+      <button data-copiar="${esc(mcp)}" style="width:100%;margin-top:8px">Copiar o endereço de novo</button>
+      ${cli.modo === "demonstracao" ? `<p class="fraco">Demonstração: o conector funciona depois que o servidor estiver no ar.</p>` : ""}
+      <button class="grande" id="ia-fechar" style="margin-top:8px">Fechar</button>`);
+  } else {
+    const contrato = new URL("openapi-chatgpt.json", location.href.split("#")[0]).toString();
+    abrirFolha(`<h2>Conectar o ChatGPT</h2><p>Abra o criador de GPT e toque nos botões na ordem, colando cada um no lugar indicado:</p>
+      <a class="botao primario grande" href="https://chatgpt.com/gpts/editor" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;text-decoration:none">1. Abrir o criador de GPT</a>
+      <button class="grande" data-copiar="${esc(INSTRUCOES_GPT)}" style="margin-top:8px">2. Copiar instruções › cole em "Instruções"</button>
+      <button class="grande" data-copiar="${esc(contrato)}" style="margin-top:8px">3. Copiar link › Ações › "Importar de URL"</button>
+      <button class="grande" data-copiar="${esc(r.segredo)}" style="margin-top:8px">4. Copiar chave › Autenticação › Chave de API › Bearer</button>
+      <p class="fraco">5. Salvar (Só eu). Se o seu ChatGPT aceitar conectores MCP: <button data-copiar="${esc(mcp)}">Copiar endereço MCP</button></p>
+      <button class="grande" id="ia-fechar" style="margin-top:8px">Fechar</button>`);
+  }
+  $("#ia-fechar").onclick = () => { fecharFolha(); mostrar(); };
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-conectar-ia]"); if (b) conectarIA(b.dataset.conectarIa).catch((err) => alert(err.message)); });
+
+// Ações de um toque da lista de configuração.
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-acao-config]"); if (!b) return;
+  const a = b.dataset.acaoConfig;
+  try {
+    if (a === "instagram") { const r = await cli.chamar("POST", "/v1/instagram/conectar", cli.modo === "demonstracao" ? { usuario_rede: "carlos.jr.81" } : {}); if (r.url) location.href = r.url; else { eu = await cli.chamar("GET", "/v1/eu"); mostrar(); } }
+    if (a === "piloto") { await cli.chamar("PUT", "/v1/organizacao", { piloto_automatico: true }); eu = await cli.chamar("GET", "/v1/eu"); mostrar(); }
+    if (a === "meta") { location.hash = "#ajustes"; }
+  } catch (err) { alert(err.message); }
+});
+
 // Lista de configuração (dono/admin): o que falta para tudo funcionar sozinho.
 async function cartaoConfiguracao() {
   if (!contaEstado || !["dono", "admin"].includes(eu.papel)) return "";
   let chaves = [];
   try { chaves = (await cli.chamar("GET", "/v1/chaves")).chaves.filter((k) => !k.revogado); } catch {}
+  // [feito?, nome, botão de UM toque ou instrução curta]
+  const botao = (attr, texto) => `<button ${attr} style="margin-top:6px">${texto}</button>`;
   const itens = [
-    [cli.modo === "servidor", "Servidor no ar", "Siga o passo 1 de docs/DEPLOY.md (um token do Supabase no GitHub).", null],
-    [!!eu.instagram_configurado, "App da Meta configurado", "Ajustes › Instagram › Configurar o app da Meta", "#ajustes"],
-    [eu.conexoes.some((c) => c.estado === "ativa"), "Instagram conectado", "Ajustes › Instagram › Conectar", "#ajustes"],
-    [!!eu.org.piloto_automatico, "Piloto automático ligado", "Ajustes › Frequência › Piloto automático", "#ajustes"],
-    [chaves.length > 0, "ChatGPT/Claude conectado", "Ajustes › Integrações › Criar chave", "#ajustes"],
-    [chaves.some((k) => k.ultimo_uso), "Assistente já usou a chave", "Peça ao assistente: 'mostre a grade de Reels'", null],
+    [cli.modo === "servidor", "Servidor no ar", `<small class="fraco">Um token do Supabase no GitHub (docs/DEPLOY.md, passo 1); o resto é automático.</small>`],
+    [!!eu.instagram_configurado, "App da Meta configurado", contaEstado.dono ? botao('data-acao-config="meta"', "Configurar agora") : `<small class="fraco">Feito pelo administrador.</small>`],
+    [eu.conexoes.some((c) => c.estado === "ativa"), "Instagram conectado", eu.instagram_configurado ? botao('data-acao-config="instagram"', "Conectar o Instagram") : `<small class="fraco">Depois do app da Meta.</small>`],
+    [!!eu.org.piloto_automatico, "Piloto automático", botao('data-acao-config="piloto"', "Ligar")],
+    [chaves.length > 0, "ChatGPT ou Claude", botao('data-conectar-ia="claude"', "Conectar Claude") + " " + botao('data-conectar-ia="chatgpt"', "Conectar ChatGPT")],
+    [chaves.some((k) => k.ultimo_uso), "Primeira conversa com o assistente", `<small class="fraco">Peça: "mostre a grade de Reels".</small>`],
   ];
   const feitos = itens.filter((x) => x[0]).length;
   if (feitos === itens.length) return "";
-  return `<details class="cartao" ${feitos < 3 ? "open" : ""}><summary><strong>Configuração: ${feitos} de ${itens.length}</strong></summary>
-    ${itens.map(([ok, nome, como, link]) => `<p>${ok ? "✅" : "⬜"} <strong>${esc(nome)}</strong>${ok ? "" : `<br><small class="fraco">${link ? `<a href="${link}">${esc(como)}</a>` : esc(como)}</small>`}</p>`).join("")}</details>`;
+  return `<details class="cartao" ${feitos < 4 ? "open" : ""}><summary><strong>Configuração: ${feitos} de ${itens.length}</strong></summary>
+    ${itens.map(([ok, nome, acao]) => `<p>${ok ? "✅" : "⬜"} <strong>${esc(nome)}</strong>${ok ? "" : `<br>${acao}`}</p>`).join("")}</details>`;
+
 }
 async function desenharChaves() {
   const alvo = $("#chaves"); if (!alvo) return;
@@ -1032,7 +1096,10 @@ async function iniciar() {
   catch (err) {
     if (err.erro === "sem_organizacao") {
       if (cli.modo === "demonstracao") { await cli.chamar("POST", "/v1/organizacoes", { nome: "Demonstração" }); await cli.chamar("POST", "/v1/instagram/conectar"); return iniciar(); }
-      document.querySelector("nav.barra").classList.add("oculto"); return telas.novoEspaco(el);
+      // Sem tela de "criar espaço": nome da conta e fuso do próprio celular.
+      let fz = FUSO_PADRAO; try { fz = Intl.DateTimeFormat().resolvedOptions().timeZone || FUSO_PADRAO; } catch {}
+      try { await cli.chamar("POST", "/v1/organizacoes", { nome: (contaEstado.conta && (contaEstado.conta.nome || contaEstado.conta.email)) || "Meu espaço", fuso: fz }); return iniciar(); }
+      catch { document.querySelector("nav.barra").classList.add("oculto"); return telas.novoEspaco(el); }
     }
     if (err.status === 401) { cli.sair(); return iniciar(); }
     el.innerHTML = `<div class="faixa erro">${mensagemErro(err)}</div><button onclick="location.reload()">Tentar de novo</button>`;

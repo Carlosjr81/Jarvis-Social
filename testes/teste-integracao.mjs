@@ -202,14 +202,18 @@ teste("app da Meta configurado pelo painel (só o dono, segredo cifrado); conect
 
 teste("piloto automático: rascunhos entram sozinhos nos horários livres; desligado não mexe", async () => {
   const e = ambiente(); const { org, video } = await e.preparar(A);
+  igual(org.piloto_automatico, true, "espaço novo já nasce com o piloto ligado");
+  await e.chamar(A, "PUT", "/v1/organizacao", { piloto_automatico: false });
   for (let i = 0; i < 2; i++) await e.chamar(A, "POST", "/v1/posts", { video_id: video.id, legenda: "p" + i, chave_idempotencia: chave() });
+  await e.chamar(A, "POST", "/v1/posts", { video_id: video.id, legenda: "segurado", segurar: true, chave_idempotencia: chave() });
   const { criarWorker } = await import("../supabase/functions/_compartilhado/worker.js");
   const w = () => criarWorker({ banco: e.banco, armazenamento: e.arm, instagram: e.ig, agora: e.relogio, api: e.api, dono: "w" + Math.random() });
   await w().rodar();
-  igual((await e.banco.listar("posts", { estado: "draft" })).length, 2, "desligado: nada muda");
+  igual((await e.banco.listar("posts", { estado: "draft" })).length, 3, "desligado: nada muda");
   await e.chamar(A, "PUT", "/v1/organizacao", { piloto_automatico: true });
   const r = await w().rodar();
-  igual(r.piloto_programados, 2);
+  igual(r.piloto_programados, 2, "o rascunho segurado fica");
+  igual((await e.banco.listar("posts", { estado: "draft" })).map((p) => p.legenda), ["segurado"]);
   igual((await e.banco.listar("posts", { estado: "scheduled" })).map((p) => p.agendado_utc).sort(), ["2026-11-23T13:00:00.000Z", "2026-11-24T13:00:00.000Z"]);
 });
 
