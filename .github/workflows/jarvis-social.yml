@@ -116,10 +116,10 @@ jobs:
           [ -n "$EMAIL_DONO" ] && ARGS+=(JS_EMAIL_DONO="$EMAIL_DONO")
           [ -n "$META_APP_ID" ] && ARGS+=(JS_META_APP_ID="$META_APP_ID")
           [ -n "$META_APP_SECRET" ] && ARGS+=(JS_META_APP_SECRET="$META_APP_SECRET")
-          supabase secrets set --project-ref "$REF" "${ARGS[@]}"
+          supabase secrets set --yes --project-ref "$REF" "${ARGS[@]}"
       - name: Funções (api, worker e conector MCP)
         if: steps.seg.outputs.ok == '1'
-        run: supabase functions deploy api worker mcp --project-ref "$REF" --use-api
+        run: supabase functions deploy api worker mcp --project-ref "$REF" --use-api --yes
       - name: Relógio do worker (pg_cron, a cada minuto) e login (URL do painel)
         if: steps.seg.outputs.ok == '1'
         run: |
