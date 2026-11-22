@@ -27,6 +27,15 @@ PostgreSQL + Storage privado; worker chamado pelo pg_cron a cada minuto
 `supabase/functions/_compartilhado/*.js`, que roda igual no Node (testes),
 no Deno (servidor) e no navegador (DEMONSTRAÇÃO).
 
+## Identidade visual (22/11/2026, pedido do dono)
+Base escura e neon do Treino Livre + degradê do Instagram (botões, chips,
+bordas) + "glitch" ciano/vermelho do TikTok (títulos) + pôr do sol neon dos
+jogos de mundo aberto (sol listrado, palmeiras, chão em grade, carimbo
+"MISSÃO CUMPRIDA"). **Só o gênero**: nenhum nome, logo, fonte (Pricedown) ou
+personagem de jogo ou rede. Fontes livres em `fontes/` (Inter e Rammetto One,
+SIL OFL). Tokens no `:root` do `index.html`; contraste medido (texto ≥ 4,5:1,
+branco sobre o degradê ≥ 4,7:1): mudou uma cor, meça de novo.
+
 ## Regras que não podem quebrar
 - Demonstração, "agendamento confirmado no Jarvis" e "publicação concluída"
   são três coisas diferentes (campo `recibo.confirmacao`). Publicado só com

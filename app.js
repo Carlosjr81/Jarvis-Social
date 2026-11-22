@@ -14,7 +14,7 @@ import { formatarLocal, partesLocais, somarDias, NOMES_DIA_LONGO, FUSO_PADRAO } 
 import { AJUDA } from "./supabase/functions/_compartilhado/comandos.js";
 import { sugerirEmail, PRAZOS_ACESSO, NOMES_SITUACAO } from "./supabase/functions/_compartilhado/acesso.js";
 
-export const VERSAO_PAINEL = "2026-11-22c";
+export const VERSAO_PAINEL = "2026-11-22d";
 const CH = { sessao: "jarvis-social:sessao", demo: "jarvis-social:demo", modo: "jarvis-social:modo", rascunho: "jarvis-social:rascunho", email: "jarvis-social:email" };
 const ls = {
   ler(k, padrao = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch { return padrao; } },
@@ -151,7 +151,7 @@ function cartaoPost(p, { acoes = true } = {}) {
       <p><strong>${esc(hora)}</strong> ${selo(p)}</p>
       ${p.recibo && p.recibo.perfil && contasUsaveis().length > 1 ? `<p class="fraco">${esc(p.recibo.perfil)}</p>` : ""}
       <p>${esc((p.legenda || "(sem legenda)").slice(0, 120))}</p>
-      ${p.permalink ? `<p><a href="${esc(p.permalink)}" target="_blank" rel="noopener">Ver no Instagram</a></p>` : ""}
+      ${p.permalink ? (p.recibo && p.recibo.confirmacao === "demonstracao" ? `<p class="fraco">Publicação simulada (sem link real)</p>` : `<p><a href="${esc(p.permalink)}" target="_blank" rel="noopener">Ver no Instagram</a></p>`) : ""}
       ${p.ultimo_erro ? `<p class="fraco">Motivo: ${esc(p.ultimo_erro)}</p>` : ""}
       ${acoes ? `<div class="linha">
         <button data-acao="detalhe">Detalhes</button>
@@ -233,19 +233,23 @@ const telas = {};
 // ------------------------------------------------------------------ porteiro (entrada, termos, espera, planos)
 let contaEstado = null;
 const pararEspera = { t: null };
+// A cena da entrada: pôr do sol neon, palmeiras e chão em grade (só CSS e SVG).
+const CENA_NEON = `<div class="cena" aria-hidden="true"><div class="titulo">JARVIS SOCIAL</div><div class="sol"></div><div class="chao"><svg viewBox="0 0 400 78" preserveAspectRatio="none"><g stroke="#FF4F8B" stroke-opacity=".75" stroke-width="1.5"><line x1="200" y1="0" x2="-400" y2="78"/><line x1="200" y1="0" x2="-340" y2="78"/><line x1="200" y1="0" x2="-280" y2="78"/><line x1="200" y1="0" x2="-220" y2="78"/><line x1="200" y1="0" x2="-160" y2="78"/><line x1="200" y1="0" x2="-100" y2="78"/><line x1="200" y1="0" x2="-40" y2="78"/><line x1="200" y1="0" x2="20" y2="78"/><line x1="200" y1="0" x2="80" y2="78"/><line x1="200" y1="0" x2="140" y2="78"/><line x1="200" y1="0" x2="200" y2="78"/><line x1="200" y1="0" x2="260" y2="78"/><line x1="200" y1="0" x2="320" y2="78"/><line x1="200" y1="0" x2="380" y2="78"/><line x1="200" y1="0" x2="440" y2="78"/><line x1="200" y1="0" x2="500" y2="78"/><line x1="200" y1="0" x2="560" y2="78"/><line x1="200" y1="0" x2="620" y2="78"/><line x1="200" y1="0" x2="680" y2="78"/><line x1="200" y1="0" x2="740" y2="78"/><line x1="200" y1="0" x2="800" y2="78"/></g><g stroke="#25F4EE" stroke-opacity=".8" stroke-width="1.5"><line x1="0" y1="2" x2="400" y2="2"/><line x1="0" y1="7" x2="400" y2="7"/><line x1="0" y1="17" x2="400" y2="17"/><line x1="0" y1="32" x2="400" y2="32"/><line x1="0" y1="52" x2="400" y2="52"/><line x1="0" y1="78" x2="400" y2="78"/></g></svg></div><svg class="palma e" viewBox="0 0 90 150" aria-hidden="true"><path d="M44 150 C46 110 47 80 50 52 L54 52 C52 82 51 112 52 150 Z"/><path d="M52 52 C30 30 10 36 0 52 C18 40 34 42 52 56 Z M52 52 C40 22 20 10 6 14 C26 20 40 34 50 58 Z M52 52 C62 22 80 14 90 20 C72 24 60 38 54 58 Z M52 52 C76 38 88 46 90 60 C78 48 64 48 54 56 Z M52 52 C50 26 56 6 66 0 C60 14 58 34 55 54 Z"/></svg><svg class="palma d" viewBox="0 0 90 150" aria-hidden="true"><path d="M44 150 C46 110 47 80 50 52 L54 52 C52 82 51 112 52 150 Z"/><path d="M52 52 C30 30 10 36 0 52 C18 40 34 42 52 56 Z M52 52 C40 22 20 10 6 14 C26 20 40 34 50 58 Z M52 52 C62 22 80 14 90 20 C72 24 60 38 54 58 Z M52 52 C76 38 88 46 90 60 C78 48 64 48 54 56 Z M52 52 C50 26 56 6 66 0 C60 14 58 34 55 54 Z"/></svg></div>`;
+const topo = (mostrar) => { const t = document.getElementById("topo"); if (t) t.classList.toggle("oculto", !mostrar); };
 function msgEm(seletor, texto, tipo = "erro") { const el = $(seletor); if (el) el.innerHTML = texto ? `<div class="faixa ${tipo}">${esc(texto)}</div>` : ""; }
 
 telas.entrar = async (el, modoTela = ls.ler(CH.email) ? "entrar" : "criar") => {
   const criar = modoTela === "criar";
-  el.innerHTML = `<h1>Jarvis Social</h1>
-    <p class="fraco">Agende e publique seus Reels pelo celular.</p>
+  topo(false);
+  el.innerHTML = `${CENA_NEON}
+    <p style="text-align:center;font-weight:700">Agende e publique seus Reels pelo celular.</p>
     <div class="chips" role="tablist"><button class="chip ${criar ? "ativo" : ""}" id="aba-criar">Criar conta</button><button class="chip ${!criar ? "ativo" : ""}" id="aba-entrar">Entrar</button></div>
     <div class="cartao"><form id="f-entrar" novalidate>
       ${criar ? `<label for="nome">Seu nome</label><input id="nome" autocomplete="name" required>` : ""}
       <label for="email">E-mail</label><input id="email" type="email" autocomplete="email" inputmode="email" value="${esc(ls.ler(CH.email) || "")}" required>
       <div id="sugestao"></div>
       <label for="senha">Senha ${criar ? "(mínimo 8)" : ""}</label>
-      <div class="linha"><input id="senha" type="password" autocomplete="${criar ? "new-password" : "current-password"}" minlength="8" required style="flex:1"><button type="button" id="mostrar">Mostrar</button></div>
+      <div class="linha"><input id="senha" type="password" autocomplete="${criar ? "new-password" : "current-password"}" minlength="8" required style="flex:1"><button type="button" id="mostrar" style="flex:0 0 auto">Mostrar</button></div>
       <div id="msg"></div>
       <button class="primario grande" type="submit" style="margin-top:12px">${criar ? "Criar minha conta" : "Entrar"}</button>
       ${!criar ? `<button type="button" id="esqueci" style="margin-top:8px;width:100%">Esqueci a senha</button>` : `<p class="fraco">Depois do cadastro, o acesso é liberado pelo administrador.</p>`}
@@ -581,6 +585,7 @@ telas.post = async (el, id) => {
   const rc = post.recibo;
   const [comMini] = await comMiniaturas([post]);
   el.innerHTML = `${faixaModo()}<h1>Publicação</h1>
+    ${post.estado === "published" ? `<span class="carimbo">MISSÃO CUMPRIDA${rc.confirmacao === "demonstracao" ? " (simulada)" : ""}</span>` : ""}
     <div class="faixa ${rc.confirmacao === "publicacao_concluida" ? "ok" : rc.confirmacao === "demonstracao" ? "demo" : ""}"><strong>${esc(confirmacaoTexto(rc))}</strong>${rc.aviso ? `<br>${esc(rc.aviso)}` : ""}</div>
     ${cartaoPost(comMini)}
     <div class="cartao"><h3>Recibo</h3><dl class="recibo">
@@ -743,7 +748,7 @@ async function rodarTestePublicacao(contaId) {
     const rc = p.recibo;
     if (p.estado === "published") {
       etapa("rede", "ok", `mídia ${rc.media_id}`);
-      $("#tp-fim").innerHTML = `<div class="faixa ${rc.confirmacao === "publicacao_concluida" ? "ok" : "demo"}"><strong>${esc(confirmacaoTexto(rc))}</strong>${rc.permalink ? `<br><a href="${esc(rc.permalink)}" target="_blank" rel="noopener">${rc.confirmacao === "demonstracao" ? "Link simulado (não abre)" : "Abrir no Instagram"}</a>` : ""}<br><a href="#post/${esc(p.id)}">Ver recibo completo</a></div>`;
+      $("#tp-fim").innerHTML = `<span class="carimbo">MISSÃO CUMPRIDA${rc.confirmacao === "demonstracao" ? " (simulada)" : ""}</span><div class="faixa ${rc.confirmacao === "publicacao_concluida" ? "ok" : "demo"}"><strong>${esc(confirmacaoTexto(rc))}</strong>${rc.permalink ? `<br><a href="${esc(rc.permalink)}" target="_blank" rel="noopener">${rc.confirmacao === "demonstracao" ? "Link simulado (não abre)" : "Abrir no Instagram"}</a>` : ""}<br><a href="#post/${esc(p.id)}">Ver recibo completo</a></div>`;
     } else {
       etapa("rede", ["failed", "cancelled", "paused"].includes(p.estado) ? "erro" : "andando", `${p.estado_texto}${p.ultimo_erro ? ": " + p.ultimo_erro : ""}`);
       $("#tp-fim").innerHTML = `<div class="faixa erro">${p.estado === "failed" ? "O teste falhou. Motivo acima." : "Ainda não terminou em 8 min; o servidor continua sozinho."} <a href="#post/${esc(p.id)}">Acompanhar no recibo</a></div>`;
@@ -868,6 +873,7 @@ async function iniciar() {
   const el = $("#tela");
   const barra = document.querySelector("nav.barra");
   clearTimeout(pararEspera.t);
+  topo(true);
   if (cli.modo === "servidor" && !cli.usuario()) { barra.classList.add("oculto"); return telas.entrar(el); }
   // O porteiro: a situação da conta vem do servidor, que é quem decide.
   try { contaEstado = await cli.chamar("GET", "/v1/conta"); }
@@ -891,6 +897,7 @@ async function iniciar() {
     return;
   }
   document.querySelector("nav.barra").classList.remove("oculto");
+  topo(true);
   await mostrar();
 }
 

@@ -3,76 +3,121 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-<meta name="theme-color" content="#0B1020">
+<meta name="theme-color" content="#0A0612">
 <title>Jarvis Social</title>
 <link rel="manifest" href="manifest.json">
+<link rel="preload" href="fontes/rammetto-one.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="icon" href="icone.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icone.svg">
 <style>
+/* Identidade Jarvis Social (22/11/2026): a base escura e neon do Treino Livre,
+   o degradê do Instagram, o "glitch" ciano e vermelho do TikTok e o pôr do sol
+   neon dos jogos de mundo aberto. Só elementos genéricos do gênero: nenhum
+   nome, logo, fonte ou personagem de jogo ou rede social. Contraste medido:
+   texto >= 4,5:1 sobre canvas e superfícies; branco sobre o degradê >= 4,7:1. */
+@font-face { font-family: "Inter"; src: url("fontes/inter-latin.woff2") format("woff2"); font-weight: 100 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Inter"; src: url("fontes/inter-latin-ext.woff2") format("woff2"); font-weight: 100 900; font-display: swap; unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Letreiro"; src: url("fontes/rammetto-one.woff2") format("woff2"); font-display: swap; }
 :root {
-  --canvas: #0B1020; --surface: #141B2E; --surface-2: #1C2540; --border: #2A3556;
-  --text: #EEF1F8; --text-2: #B7C0D8; --muted: #8D97B3;
-  --brand: #35D6A4; --on-brand: #06231A; --warn: #F5C451; --danger: #FF7A85; --info: #7FB2FF;
-  --raio: 14px;
-}
-@media (prefers-color-scheme: light) {
-  :root { --canvas: #F5F7FB; --surface: #FFFFFF; --surface-2: #EEF2F8; --border: #D5DCEA;
-    --text: #0E1424; --text-2: #39435C; --muted: #5A6480; --brand: #0E8C66; --on-brand: #FFFFFF;
-    --warn: #8A5B00; --danger: #B3261E; --info: #1F5BB8; }
+  --canvas: #0A0612; --surface: #160E26; --surface-2: #21163A; --border: #3A2A5A;
+  --text: #F7F2FF; --text-2: #CFC3E8; --muted: #A497C2;
+  /* Instagram */ --ig-1: #D62976; --ig-2: #962FBF; --ig-3: #4F5BD5; --ig-laranja: #FFA24C; --ig-rosa: #FF4F8B;
+  /* TikTok */ --tt-ciano: #25F4EE; --tt-vermelho: #FE2C55;
+  /* pôr do sol neon */ --sol-1: #FFD23F; --sol-2: #FF7A3D; --sol-3: #FF2E88; --ceu-1: #2A0B4A; --ceu-2: #5B1460;
+  --brand: var(--tt-ciano); --grad: linear-gradient(120deg, var(--ig-1), var(--ig-2) 55%, var(--ig-3));
+  --on-brand: #FFFFFF; --warn: var(--sol-1); --danger: #FF5C7A; --info: var(--tt-ciano); --ok: #3DFFA8;
+  --raio: 16px; --letreiro: "Letreiro", "Inter", system-ui, sans-serif;
+  --glitch: 2px -2px 0 var(--tt-ciano), -2px 2px 0 var(--tt-vermelho);
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; background: var(--canvas); color: var(--text); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); overflow-x: hidden; }
-main { max-width: 640px; margin: 0 auto; padding: 12px 16px 24px; }
-h1 { font-size: 22px; margin: 6px 0 12px; } h2 { font-size: 18px; margin: 18px 0 8px; } h3 { font-size: 16px; margin: 12px 0 6px; }
+html, body { margin: 0; color: var(--text); font: 16px/1.45 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+body { background: radial-gradient(1200px 520px at 50% -180px, #5B146066, transparent 70%), var(--canvas); background-attachment: fixed; padding-bottom: calc(72px + env(safe-area-inset-bottom)); overflow-x: hidden; min-height: 100vh; }
+main { max-width: 640px; margin: 0 auto; padding: 8px 16px 24px; }
+h1 { font-family: var(--letreiro); font-weight: 400; font-size: 26px; letter-spacing: .5px; margin: 10px 0 14px; text-shadow: var(--glitch); }
+h2 { font-size: 18px; margin: 18px 0 8px; font-weight: 800; letter-spacing: .2px; } h3 { font-size: 16px; margin: 12px 0 6px; }
 p { margin: 6px 0; } small, .fraco { color: var(--muted); }
-a { color: var(--info); }
-.cartao { background: var(--surface); border: 1px solid var(--border); border-radius: var(--raio); padding: 14px; margin: 10px 0; }
-.faixa { border-radius: 10px; padding: 10px 12px; margin: 8px 0; font-size: 14px; border: 1px solid var(--border); background: var(--surface-2); }
-.faixa.demo { border-color: var(--warn); color: var(--warn); font-weight: 600; }
-.faixa.erro { border-color: var(--danger); color: var(--danger); }
-.faixa.ok { border-color: var(--brand); color: var(--brand); }
-button, .botao { min-height: 48px; padding: 10px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; touch-action: manipulation; }
-button.primario, .botao.primario { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+a { color: var(--tt-ciano); }
+
+/* o letreiro do topo: pôr do sol neon em miniatura */
+.topo { position: relative; height: 76px; overflow: hidden; background: linear-gradient(180deg, var(--ceu-1), var(--ceu-2) 70%, #8A1E5A); border-bottom: 2px solid transparent; border-image: var(--grad) 1; }
+.topo .sol { position: absolute; left: 50%; bottom: -46px; width: 120px; height: 120px; transform: translateX(-50%); border-radius: 50%;
+  background: linear-gradient(180deg, var(--sol-1), var(--sol-2) 50%, var(--sol-3));
+  -webkit-mask: repeating-linear-gradient(180deg, #000 0 9px, transparent 9px 13px); mask: repeating-linear-gradient(180deg, #000 0 9px, transparent 9px 13px); opacity: .9; }
+.topo .palma { position: absolute; bottom: -2px; width: 54px; height: 70px; fill: #12061F; }
+.topo .palma.e { left: 8px; } .topo .palma.d { right: 8px; transform: scaleX(-1); }
+.topo .nome { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 10px;
+  font-family: var(--letreiro); font-size: 24px; letter-spacing: 1px; color: #fff; text-shadow: var(--glitch), 0 0 18px #FF2E8899; }
+.topo .nome img { width: 34px; height: 34px; }
+
+/* a cena grande (entrada): sol listrado, palmeiras e chão em grade */
+.cena { position: relative; height: 240px; margin: 0 -16px 12px; overflow: hidden; background: linear-gradient(180deg, #12052A, var(--ceu-1) 35%, var(--ceu-2) 62%, #A12A5E 72%); }
+.cena .sol { position: absolute; left: 50%; top: 52px; width: 190px; height: 190px; transform: translateX(-50%); border-radius: 50%; background: linear-gradient(180deg, var(--sol-1), var(--sol-2) 45%, var(--sol-3));
+  -webkit-mask: linear-gradient(#000 0 0) top/100% 42% no-repeat, repeating-linear-gradient(180deg, #000 0 12px, transparent 12px 18px); mask: linear-gradient(#000 0 0) top/100% 42% no-repeat, repeating-linear-gradient(180deg, #000 0 12px, transparent 12px 18px); box-shadow: 0 0 60px #FF2E8866; }
+.cena .chao { position: absolute; left: 0; right: 0; bottom: 0; height: 78px; background: linear-gradient(180deg, #2A0730, #0E0318); }
+.cena .chao svg { width: 100%; height: 100%; display: block; }
+.cena .palma { position: absolute; bottom: 50px; width: 90px; height: 150px; fill: #0C0318; transform-origin: bottom center; animation: balanca 5s ease-in-out infinite; }
+.cena .palma.e { left: -6px; } .cena .palma.d { right: -6px; transform: scaleX(-1); animation-name: balanca-d; }
+@keyframes balanca { 50% { transform: rotate(2deg); } } @keyframes balanca-d { 50% { transform: scaleX(-1) rotate(2deg); } }
+.cena .titulo { position: absolute; left: 0; right: 0; top: 14px; text-align: center; font-family: var(--letreiro); font-size: 34px; color: #fff; text-shadow: var(--glitch), 0 0 22px #FF2E88aa; }
+
+.cartao { background: linear-gradient(180deg, #ffffff06, transparent 40%), var(--surface); border: 1px solid var(--border); border-radius: var(--raio); padding: 14px; margin: 10px 0; }
+.faixa { border-radius: 12px; padding: 10px 12px; margin: 8px 0; font-size: 14px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); text-decoration: none; }
+.faixa.demo { border-color: var(--sol-1); color: var(--sol-1); font-weight: 700; background: #2A1E08; }
+.faixa.erro { border-color: var(--danger); color: #FFD3DB; background: #2A0D17; }
+.faixa.ok { border-color: var(--ok); color: #CFFFE9; background: #0B2A20; }
+button, .botao { min-height: 48px; padding: 10px 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; touch-action: manipulation; }
+button.primario, .botao.primario { background: var(--grad); color: var(--on-brand); border: 0; box-shadow: 0 6px 22px #D6297644, inset 0 1px 0 #ffffff33; text-shadow: 0 1px 0 #00000040; }
+button.primario:active, .botao.primario:active { transform: translateY(1px); }
 button.perigo { color: var(--danger); border-color: var(--danger); background: transparent; }
 button:disabled { opacity: .5; cursor: not-allowed; }
-button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--info); outline-offset: 2px; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--tt-ciano); outline-offset: 2px; }
 .linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .linha > button { flex: 1 1 auto; }
 .grande { width: 100%; font-size: 18px; min-height: 56px; }
-label { display: block; font-weight: 600; margin: 12px 0 4px; }
-input, textarea, select { width: 100%; min-height: 48px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; }
+.botao.primario.grande { font-family: var(--letreiro); font-weight: 400; letter-spacing: .5px; }
+label { display: block; font-weight: 700; margin: 12px 0 4px; }
+input, textarea, select { width: 100%; min-height: 48px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: #0F0A1C; color: var(--text); font: inherit; }
+input::placeholder, textarea::placeholder { color: var(--muted); }
 textarea { min-height: 140px; resize: vertical; }
-input[type=checkbox] { width: 22px; min-height: 22px; height: 22px; }
+input[type=checkbox] { width: 22px; min-height: 22px; height: 22px; accent-color: var(--ig-1); }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
-.chip { min-height: 40px; padding: 6px 12px; border-radius: 999px; font-weight: 500; font-size: 14px; }
-.chip.ativo { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
-.selo { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1px solid currentColor; }
-.selo.scheduled { color: var(--info); } .selo.published { color: var(--brand); } .selo.failed, .selo.needs_reconciliation { color: var(--danger); }
-.selo.paused, .selo.retry_wait { color: var(--warn); } .selo.cancelled, .selo.draft { color: var(--muted); }
+.chip { min-height: 40px; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 14px; }
+.chip.ativo { background: var(--grad); color: #fff; border-color: transparent; }
+.selo { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1px solid currentColor; letter-spacing: .3px; }
+.selo.scheduled { color: var(--tt-ciano); } .selo.published { color: var(--sol-1); } .selo.failed, .selo.needs_reconciliation { color: var(--danger); }
+.selo.paused, .selo.retry_wait { color: var(--ig-laranja); } .selo.cancelled, .selo.draft { color: var(--muted); }
 .item { display: flex; gap: 12px; align-items: flex-start; }
-.miniatura { width: 56px; height: 100px; border-radius: 8px; object-fit: cover; background: var(--surface-2); flex: 0 0 auto; }
+.miniatura { width: 56px; height: 100px; border-radius: 10px; object-fit: cover; background: var(--surface-2); flex: 0 0 auto; border: 1px solid var(--border); }
 .item .texto { min-width: 0; flex: 1; } .item .texto p { overflow-wrap: anywhere; }
-.dia { font-weight: 700; color: var(--text-2); margin-top: 16px; text-transform: capitalize; }
-nav.barra { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr); background: var(--surface); border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom); z-index: 5; }
-nav.barra a { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60px; color: var(--muted); text-decoration: none; font-size: 12px; gap: 2px; }
-nav.barra a.ativo { color: var(--brand); font-weight: 700; }
+.dia { font-family: var(--letreiro); font-size: 15px; color: var(--ig-rosa); margin-top: 18px; text-transform: capitalize; letter-spacing: .3px; }
+nav.barra { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr); background: #0E0819F2; backdrop-filter: blur(8px); border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom); z-index: 5; }
+nav.barra a { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60px; color: var(--muted); text-decoration: none; font-size: 12px; gap: 2px; }
+nav.barra a.ativo { color: var(--tt-ciano); font-weight: 800; }
+nav.barra a.ativo::before { content: ""; position: absolute; top: 0; left: 22%; right: 22%; height: 3px; border-radius: 0 0 4px 4px; background: var(--grad); }
 nav.barra span.ic { font-size: 20px; line-height: 1; }
-.previa { position: relative; width: 100%; max-width: 270px; aspect-ratio: 9/16; margin: 8px auto; background: #000; border-radius: 12px; overflow: hidden; }
+.previa { position: relative; width: 100%; max-width: 270px; aspect-ratio: 9/16; margin: 8px auto; background: #000; border-radius: 14px; overflow: hidden; border: 2px solid transparent; background-clip: padding-box; box-shadow: 0 0 0 2px var(--ig-2), 0 10px 30px #962FBF44; }
 .previa video, .previa img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .previa .grade { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); aspect-ratio: 3/4; border: 2px dashed rgba(255,255,255,.9); box-shadow: 0 0 0 999px rgba(0,0,0,.45); pointer-events: none; }
 .barra-prog { height: 10px; border-radius: 6px; background: var(--surface-2); overflow: hidden; margin: 6px 0; }
-.barra-prog > div { height: 100%; background: var(--brand); width: 0; transition: width .2s; }
-.passos { display: flex; gap: 4px; margin: 4px 0 12px; } .passos span { flex: 1; height: 4px; border-radius: 4px; background: var(--border); } .passos span.feito { background: var(--brand); }
+.barra-prog > div { height: 100%; background: var(--grad); width: 0; transition: width .2s; }
+.passos { display: flex; gap: 4px; margin: 4px 0 12px; } .passos span { flex: 1; height: 5px; border-radius: 4px; background: var(--border); } .passos span.feito { background: var(--grad); }
 pre.resposta { white-space: pre-wrap; font: inherit; margin: 8px 0 0; }
 dl.recibo { display: grid; grid-template-columns: max-content 1fr; gap: 4px 10px; margin: 8px 0; font-size: 14px; } dl.recibo dt { color: var(--muted); } dl.recibo dd { margin: 0; overflow-wrap: anywhere; }
-.folha { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 10; display: flex; align-items: flex-end; justify-content: center; }
-.folha > div { background: var(--surface); width: 100%; max-width: 640px; max-height: 92vh; overflow: auto; border-radius: 18px 18px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
+.folha { position: fixed; inset: 0; background: rgba(5,2,12,.7); z-index: 10; display: flex; align-items: flex-end; justify-content: center; }
+.folha > div { background: var(--surface); width: 100%; max-width: 640px; max-height: 92vh; overflow: auto; border-radius: 20px 20px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); border-top: 2px solid transparent; border-image: var(--grad) 1; }
+/* o carimbo de missão cumprida (publicado de verdade ou no fim do teste) */
+.carimbo { display: block; width: max-content; max-width: 100%; margin: 12px auto; padding: 6px 18px; font-family: var(--letreiro); font-size: 24px; color: var(--sol-1); border: 3px solid var(--sol-1); border-radius: 10px; transform: rotate(-4deg); text-shadow: 2px 2px 0 #000; box-shadow: 0 0 24px #FFD23F44; animation: carimbo .45s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes carimbo { from { transform: rotate(-4deg) scale(2.4); opacity: 0; } }
 .oculto { display: none !important; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
+<header class="topo" id="topo">
+  <div class="sol" aria-hidden="true"></div><svg class="palma e" viewBox="0 0 90 150" aria-hidden="true"><path d="M44 150 C46 110 47 80 50 52 L54 52 C52 82 51 112 52 150 Z"/><path d="M52 52 C30 30 10 36 0 52 C18 40 34 42 52 56 Z M52 52 C40 22 20 10 6 14 C26 20 40 34 50 58 Z M52 52 C62 22 80 14 90 20 C72 24 60 38 54 58 Z M52 52 C76 38 88 46 90 60 C78 48 64 48 54 56 Z M52 52 C50 26 56 6 66 0 C60 14 58 34 55 54 Z"/></svg><svg class="palma d" viewBox="0 0 90 150" aria-hidden="true"><path d="M44 150 C46 110 47 80 50 52 L54 52 C52 82 51 112 52 150 Z"/><path d="M52 52 C30 30 10 36 0 52 C18 40 34 42 52 56 Z M52 52 C40 22 20 10 6 14 C26 20 40 34 50 58 Z M52 52 C62 22 80 14 90 20 C72 24 60 38 54 58 Z M52 52 C76 38 88 46 90 60 C78 48 64 48 54 56 Z M52 52 C50 26 56 6 66 0 C60 14 58 34 55 54 Z"/></svg>
+  <div class="nome"><img src="icone.svg" alt="" width="34" height="34">JARVIS SOCIAL</div>
+</header>
 <main id="tela" aria-live="polite"><p>Carregando…</p></main>
 <nav class="barra" aria-label="Navegação">
   <a href="#inicio" data-aba="inicio"><span class="ic" aria-hidden="true">⌂</span>Início</a>

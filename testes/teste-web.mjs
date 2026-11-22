@@ -15,6 +15,12 @@ teste("config.js não traz segredo (só URL e chave anon)", () => {
   const c = fs.readFileSync(path.join(RAIZ, "config.js"), "utf8");
   verdade(!/service_role|SERVICE_ROLE|secret|sb_secret_/i.test(c.replace(/\/\/.*$/gm, "")), "config.js com segredo");
 });
+teste("identidade: fontes livres com licença, tokens de cor e nada de marca de terceiros", () => {
+  for (const f of ["inter-latin.woff2", "inter-latin-ext.woff2", "rammetto-one.woff2", "LICENSE-Inter.txt", "LICENSE-Rammetto.txt"]) verdade(fs.existsSync(path.join(RAIZ, "fontes", f)), "falta " + f);
+  const html = fs.readFileSync(path.join(RAIZ, "index.html"), "utf8");
+  for (const t of ["--ig-1", "--tt-ciano", "--tt-vermelho", "--sol-1", "--grad", "--glitch"]) verdade(html.includes(t), "token " + t);
+  verdade(!/pricedown|grand theft|rockstar/i.test(html + fs.readFileSync(path.join(RAIZ, "app.js"), "utf8")), "nome ou fonte de jogo no painel");
+});
 teste("manifest e ícone existem; SW com escopo da pasta", () => {
   const m = JSON.parse(fs.readFileSync(path.join(RAIZ, "manifest.json"), "utf8"));
   igual([m.scope, m.display, m.lang], ["./", "standalone", "pt-BR"]); verdade(fs.existsSync(path.join(RAIZ, "icone.svg")));
@@ -107,8 +113,13 @@ if (pw) {
       await pg.click("#tp-ir");
       await pg.locator("#tp-fim", { hasText: "Demonstração (simulado)" }).waitFor({ timeout: 30000 });
       igual(await pg.locator("#tp-etapas p", { hasText: "✅" }).count(), 6, "seis etapas concluídas");
+      await pg.locator("#tp-fim .carimbo", { hasText: "MISSÃO CUMPRIDA (simulada)" }).waitFor();
       await pg.screenshot({ path: path.join(RAIZ, "testes/saida/teste-imediato-360.png"), fullPage: true });
       await pg.click("#tp-fechar");
+      await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#agenda`);
+      await pg.locator("[data-filtro=publicados]").click();
+      await pg.getByText("Publicação simulada (sem link real)").first().waitFor();
+      igual(await pg.getByText("Ver no Instagram").count(), 0, "post simulado nunca ganha link de Instagram");
       // Painel de usuários do dono: simular um cadastro e liberar por 30 dias.
       await pg.goto(`http://127.0.0.1:${porta}/jarvis-social/#usuarios`);
       await pg.getByRole("heading", { name: "Painel de usuários" }).waitFor();

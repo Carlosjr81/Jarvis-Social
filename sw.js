@@ -1,8 +1,9 @@
 // Jarvis Social: service worker próprio (escopo só desta pasta).
 // Guarda a casca do painel para abrir sem rede. NUNCA guarda a API:
 // agendamento só vale depois de chegar ao servidor.
-const CACHE = "jarvis-social-v3";
+const CACHE = "jarvis-social-v4";
 const CASCA = ["./", "./index.html", "./app.js", "./config.js", "./manifest.json", "./icone.svg",
+  "./fontes/inter-latin.woff2", "./fontes/inter-latin-ext.woff2", "./fontes/rammetto-one.woff2",
   "./supabase/functions/_compartilhado/api.js", "./supabase/functions/_compartilhado/tempo.js",
   "./supabase/functions/_compartilhado/frequencia.js", "./supabase/functions/_compartilhado/estados.js",
   "./supabase/functions/_compartilhado/comandos.js", "./supabase/functions/_compartilhado/banco.js",
