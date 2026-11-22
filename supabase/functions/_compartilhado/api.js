@@ -177,7 +177,8 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
       usuario: { id: ctx.usuario.id, email: ctx.usuario.email },
       organizacoes: await Promise.all(ctx.membros.map(async (m) => ({ id: m.org_id, papel: m.papel, nome: (await banco.obter("organizacoes", m.org_id) || {}).nome }))),
       org: ctx.org, papel: ctx.papel, conexoes, alertas,
-      instagram_configurado: demonstracao || !!(segredos.appId && segredos.appSecret),
+      instagram_configurado: demonstracao || !!(await acesso.credenciaisMeta()),
+      redirect_uri_meta: segredos.redirectUri || null,
     };
   };
 
@@ -200,6 +201,7 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     if (c.fuso != null) { if (!fusoValido(c.fuso)) falha(400, "fuso_invalido", "Fuso desconhecido."); m.fuso = c.fuso; }
     if (c.politica_atraso != null) { if (!["aguardar", "publicar", "reagendar"].includes(c.politica_atraso)) falha(400, "invalido", "Política de atraso inválida."); m.politica_atraso = c.politica_atraso; }
     if (c.tolerancia_atraso_min != null) m.tolerancia_atraso_min = Math.max(0, Math.min(1440, +c.tolerancia_atraso_min || 0));
+    if (c.piloto_automatico !== undefined) m.piloto_automatico = !!c.piloto_automatico;
     if (c.conta_padrao_id !== undefined) m.conta_padrao_id = c.conta_padrao_id ? (await contaPadrao(ctx, c.conta_padrao_id)).id : null;
     return { org: await banco.atualizar("organizacoes", ctx.org.id, m) };
   };
@@ -562,9 +564,10 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
       if (!ctx.org.conta_padrao_id) await banco.atualizar("organizacoes", ctx.org.id, { conta_padrao_id: nova.id });
       return { url: null, simulado: true, conexao: semSegredo(nova) };
     }
-    if (!segredos.appId || !segredos.appSecret || !segredos.redirectUri) falha(503, "instagram_nao_configurado", "O app da Meta ainda não foi configurado no servidor (veja docs/DEPLOY.md, passo Meta).");
+    const meta = await acesso.credenciaisMeta();
+    if (!meta || !segredos.redirectUri) falha(503, "instagram_nao_configurado", "O app da Meta ainda não foi configurado: Ajustes › Instagram › Configurar o app da Meta (só o dono).");
     const estado = await banco.inserir("estados_oauth", { org_id: ctx.org.id, usuario_id: ctx.usuario.id, expira_em: new Date(Date.parse(agora()) + 10 * 60e3).toISOString(), usado: false });
-    return { url: instagram.urlAutorizacao({ appId: segredos.appId, redirectUri: segredos.redirectUri, estado: estado.id }) };
+    return { url: instagram.urlAutorizacao({ appId: meta.appId, redirectUri: segredos.redirectUri, estado: estado.id }) };
   };
 
   op.retornoInstagram = async (q) => {
@@ -575,7 +578,9 @@ export function criarApi({ banco, armazenamento, instagram, agora = () => new Da
     const marcado = await banco.atualizar("estados_oauth", est.id, { usado: true }, { usado: false });
     if (!marcado) return voltar("expirado");
     try {
-      const t = await instagram.trocarCodigo({ appId: segredos.appId, appSecret: segredos.appSecret, redirectUri: segredos.redirectUri, codigo: q.code, agoraMs: Date.parse(agora()) });
+      const meta = await acesso.credenciaisMeta();
+      if (!meta) return voltar("erro");
+      const t = await instagram.trocarCodigo({ appId: meta.appId, appSecret: meta.appSecret, redirectUri: segredos.redirectUri, codigo: q.code, agoraMs: Date.parse(agora()) });
       const perfil = await instagram.perfil({ token: t.token });
       const dados = { org_id: est.org_id, rede: "instagram", ig_user_id: String(perfil.user_id || t.igUserId), usuario_rede: perfil.username, tipo_conta: perfil.account_type || null, estado: "ativa", token_cifrado: await cifrar(t.token, segredos.chaveCifra), token_expira_em: t.expiraEm, permissoes: t.permissoes, conectado_por: est.usuario_id, atualizado_em: agora() };
       const existe = await banco.listar("conexoes", { org_id: est.org_id, ig_user_id: dados.ig_user_id });

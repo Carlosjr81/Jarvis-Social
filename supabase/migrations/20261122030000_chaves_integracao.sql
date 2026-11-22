@@ -22,3 +22,9 @@ end $$;
 
 -- Mídia importada por link (ChatGPT/Claude programando como no Metricool).
 alter table midias add column origem_url text;
+
+-- Menos passos na instalação: dono automático (primeira conta confirmada) e
+-- app da Meta configurado pelo painel (segredo cifrado). Piloto automático.
+alter table config_plataforma add column dono_email text, add column dono_desde timestamptz,
+  add column meta_app_id text, add column meta_app_secret_cifrado text;
+alter table organizacoes add column piloto_automatico boolean not null default false;

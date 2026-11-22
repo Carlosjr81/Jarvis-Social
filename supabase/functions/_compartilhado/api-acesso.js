@@ -8,7 +8,7 @@ import {
   acessoPago, acessoDevolvido, pixCopiaECola, txidPagamento, csvContas, csvPagamentos, ONLINE_MS, SUMIDO_MS, NOMES_SITUACAO,
 } from "./acesso.js";
 import { TERMOS, CONDICOES_ASSINATURA } from "./termos.js";
-import { sha256Hex } from "./cifra.js";
+import { sha256Hex, cifrar, decifrar } from "./cifra.js";
 
 export class ErroAcesso extends Error {
   constructor(status, codigo, mensagem, extra = {}) { super(mensagem); this.status = status; this.codigo = codigo; this.extra = extra; }
@@ -19,8 +19,13 @@ const ID_CONFIG = "acesso";
 export async function impressaoTermos() { return sha256Hex(JSON.stringify(TERMOS)); }
 
 export function criarAcesso({ banco, agora, segredos = {}, demonstracao = false, autenticacao = null }) {
-  const donos = (segredos.emailsDono || []).map((e) => e.toLowerCase());
-  const ehDono = (u) => !!(u && u.email && donos.includes(String(u.email).toLowerCase()) && u.email_confirmado);
+  // Dono: o(s) e-mail(s) de JS_EMAIL_DONO; sem isso, a PRIMEIRA conta com e-mail
+  // confirmado vira dona sozinha (config_plataforma.dono_email). Menos um passo
+  // na instalação; a tela avisa o e-mail que ficou como dono.
+  const donosFixos = (segredos.emailsDono || []).map((e) => e.toLowerCase());
+  const listaDonos = (cfg) => donosFixos.length ? donosFixos : (cfg && cfg.dono_email ? [String(cfg.dono_email).toLowerCase()] : []);
+  const ehEmailDono = (email, cfg) => listaDonos(cfg).includes(String(email || "").toLowerCase());
+  const ehDono = (u, cfg) => !!(u && u.email && u.email_confirmado && ehEmailDono(u.email, cfg));
 
   async function config() {
     return (await banco.obter("config_plataforma", ID_CONFIG)) || { id: ID_CONFIG };
@@ -29,8 +34,15 @@ export function criarAcesso({ banco, agora, segredos = {}, demonstracao = false,
   // Lê (ou cria) a conta de quem chamou e devolve a situação de agora.
   async function verificar(usuario, { registrarAcesso = false } = {}) {
     if (!usuario || !usuario.id) falha(401, "nao_autenticado", "Entre na sua conta.");
-    const dono = ehDono(usuario);
-    const cfg = await config();
+    let cfg = await config();
+    if (!donosFixos.length && !cfg.dono_email && usuario.email && usuario.email_confirmado) {
+      const email = String(usuario.email).toLowerCase();
+      const existe = await banco.obter("config_plataforma", ID_CONFIG);
+      const ok = existe ? await banco.atualizar("config_plataforma", ID_CONFIG, { dono_email: email, dono_desde: agora() }, { dono_email: null })
+        : await banco.inserir("config_plataforma", { id: ID_CONFIG, dono_email: email, dono_desde: agora() }).catch(() => null);
+      cfg = (await banco.obter("config_plataforma", ID_CONFIG)) || cfg;
+    }
+    const dono = ehDono(usuario, cfg);
     const cob = lerCobranca(cfg);
     let conta = await banco.obter("contas", usuario.id);
     const t = agora();
@@ -84,7 +96,7 @@ export function criarAcesso({ banco, agora, segredos = {}, demonstracao = false,
         pagamentos: (await banco.listar("pagamentos", { status: "informado" })).length,
       };
     }
-    if (donos.length && donos.includes(String(usuario.email || "").toLowerCase()) && !usuario.email_confirmado) {
+    if (ehEmailDono(usuario.email, v.cfg) && !usuario.email_confirmado) {
       r.aviso_dono = "Confirme o seu e-mail (link enviado no cadastro) para entrar como dono.";
     }
     return r;
@@ -170,7 +182,7 @@ export function criarAcesso({ banco, agora, segredos = {}, demonstracao = false,
     if (!v.dono) falha(403, "so_dono", "Só o dono acessa o painel de usuários.");
     const t = agora();
     const [r1, r2, r3] = partes;
-    const cob = v.cob;
+    const cob = v.cob, cfg = v.cfg;
 
     if (r1 === "resumo" && M === "GET") {
       const todas = await banco.listar("contas", {});
@@ -185,12 +197,12 @@ export function criarAcesso({ banco, agora, segredos = {}, demonstracao = false,
     if (r1 === "contas" && !r2 && M === "GET") {
       const lista = filtrar(await banco.listar("contas", {}, { ordem: "criado_em", desc: true }), consulta.filtro, consulta.busca, t, cob);
       if (consulta.formato === "csv") return { csv: csvContas(lista, t, cob), nome: `contas-jarvis-social-${t.slice(0, 10)}.csv` };
-      return { contas: lista.map((c) => { const p = planoDaConta(c, t, cob, donos.includes(c.email)); return { ...c, situacao: situacaoConta(c, t, cob, donos.includes(c.email)), plano_texto: textoPlano(p, cob), online: !!(c.ultimo_acesso && Date.parse(t) - Date.parse(c.ultimo_acesso) < ONLINE_MS) }; }) };
+      return { contas: lista.map((c) => { const p = planoDaConta(c, t, cob, ehEmailDono(c.email, cfg)); return { ...c, situacao: situacaoConta(c, t, cob, ehEmailDono(c.email, cfg)), plano_texto: textoPlano(p, cob), online: !!(c.ultimo_acesso && Date.parse(t) - Date.parse(c.ultimo_acesso) < ONLINE_MS) }; }) };
     }
     if (r1 === "contas" && r2 && M === "POST") {
       const c = await banco.obter("contas", r2);
       if (!c) falha(404, "conta", "Conta não encontrada.");
-      if (donos.includes(c.email) && ["bloquear", "remover"].includes(corpo.acao)) falha(409, "dono", "Não dá para bloquear ou remover o dono.");
+      if (ehEmailDono(c.email, cfg) && ["bloquear", "remover"].includes(corpo.acao)) falha(409, "dono", "Não dá para bloquear ou remover o dono.");
       const dec = { decidido_em: t };
       const dias = +corpo.dias || 0;
       let m;
@@ -239,7 +251,7 @@ export function criarAcesso({ banco, agora, segredos = {}, demonstracao = false,
       const salvo = (await banco.obter("config_plataforma", ID_CONFIG)) ? await banco.atualizar("config_plataforma", ID_CONFIG, m) : await banco.inserir("config_plataforma", m);
       const cobNova = lerCobranca(salvo);
       const exemplo = cobNova.pix.chave ? pixCopiaECola({ ...cobNova.pix, valor: 1, txid: "TESTE" }) : null;
-      const semPlano = cobNova.ligada ? (await banco.listar("contas", {})).filter((c) => situacaoConta(c, t, cobNova, donos.includes(c.email)) === "pagar").length : 0;
+      const semPlano = cobNova.ligada ? (await banco.listar("contas", {})).filter((c) => situacaoConta(c, t, cobNova, ehEmailDono(c.email, cfg)) === "pagar").length : 0;
       return { config: { ...salvo, ...cobNova }, pix_exemplo: exemplo, contas_sem_plano_agora: semPlano };
     }
     if (r1 === "pagamentos" && !r2 && M === "GET") {
@@ -275,6 +287,18 @@ export function criarAcesso({ banco, agora, segredos = {}, demonstracao = false,
       }
       falha(400, "acao", "Ação desconhecida.");
     }
+    if (r1 === "meta" && M === "GET") {
+      return { configurado: !!(segredos.appId || cfg.meta_app_id), app_id: segredos.appId || cfg.meta_app_id || null, pelo_servidor: !!segredos.appId, redirect_uri: segredos.redirectUri || null };
+    }
+    if (r1 === "meta" && M === "PUT") {
+      const id = String(corpo.app_id || "").trim(), sec = String(corpo.app_secret || "").trim();
+      if (!/^\d{6,25}$/.test(id)) falha(400, "app_id", "O ID do app tem só números (Painel da Meta › Instagram › Configuração da API).");
+      if (!/^[0-9a-f]{20,64}$/i.test(sec)) falha(400, "app_secret", "A chave secreta do app tem letras e números (a-f, 0-9).");
+      const segredoGuardado = segredos.chaveCifra ? await cifrar(sec, segredos.chaveCifra) : "simulado:" + sec.slice(0, 4);
+      const m = { id: ID_CONFIG, meta_app_id: id, meta_app_secret_cifrado: segredoGuardado, atualizado_em: t };
+      if (await banco.obter("config_plataforma", ID_CONFIG)) await banco.atualizar("config_plataforma", ID_CONFIG, m); else await banco.inserir("config_plataforma", m);
+      return { configurado: true, app_id: id };
+    }
     if (r1 === "aceites" && M === "GET") {
       return { aceites: await banco.listar("aceites", consulta.conta_id ? { conta_id: consulta.conta_id } : {}, { ordem: "em", desc: true, limite: 1000 }) };
     }
@@ -293,10 +317,18 @@ export function criarAcesso({ banco, agora, segredos = {}, demonstracao = false,
     for (const m of await banco.listar("membros", { org_id: orgId, papel: "dono" })) {
       const c = await banco.obter("contas", m.usuario_id);
       if (!c) continue; // conta removida da lista não sustenta o espaço
-      if (situacaoConta(c, t, cob, donos.includes(c.email)) === "liberado") return true;
+      if (situacaoConta(c, t, cob, ehEmailDono(c.email, cfg)) === "liberado") return true;
     }
     return false;
   }
 
-  return { verificar, exigirLiberado, rotaConta, rotaAdmin, orgComAcesso, ehDono };
+  async function credenciaisMeta() {
+    if (segredos.appId && segredos.appSecret) return { appId: segredos.appId, appSecret: segredos.appSecret };
+    const cfg = await config();
+    if (!cfg.meta_app_id || !cfg.meta_app_secret_cifrado) return null;
+    const appSecret = String(cfg.meta_app_secret_cifrado).startsWith("simulado:") ? "simulado" : await decifrar(cfg.meta_app_secret_cifrado, segredos.chaveCifra);
+    return { appId: cfg.meta_app_id, appSecret };
+  }
+
+  return { verificar, exigirLiberado, rotaConta, rotaAdmin, orgComAcesso, ehDono, credenciaisMeta, config };
 }

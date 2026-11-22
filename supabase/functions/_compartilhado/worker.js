@@ -20,7 +20,7 @@ export function espera(tentativa, { esperarSeg, aleatorio = Math.random } = {}) 
   return Math.round(base * (0.8 + 0.4 * aleatorio()));
 }
 
-export function criarWorker({ banco, armazenamento, instagram, agora = () => new Date().toISOString(), segredos = {}, dono = "worker", aleatorio = Math.random, registrar: log = () => {}, esperaStatusSeg = ESPERA_STATUS_SEG }) {
+export function criarWorker({ banco, armazenamento, instagram, agora = () => new Date().toISOString(), segredos = {}, dono = "worker", aleatorio = Math.random, registrar: log = () => {}, esperaStatusSeg = ESPERA_STATUS_SEG, api = null }) {
   const acesso = criarAcesso({ banco, agora, segredos });
   const mais = (seg) => new Date(Date.parse(agora()) + seg * 1000).toISOString();
 
@@ -248,10 +248,27 @@ export function criarWorker({ banco, armazenamento, instagram, agora = () => new
         resultados.push({ job: job.id, post: job.post_id, resultado: "erro_interno", detalhe: String(e && e.message) });
       }
     }
+    // Piloto automático: rascunhos com vídeo (do painel ou do ChatGPT/Claude)
+    // entram sozinhos nos próximos horários livres da grade.
+    let piloto = 0;
+    if (api) {
+      try {
+        for (const org of await banco.listar("organizacoes", { piloto_automatico: true })) {
+          if (org.fila_pausada) continue;
+          const rasc = await banco.listar("posts", { org_id: org.id, estado: "draft" }, { limite: 1 });
+          if (!rasc.length) continue;
+          const [donoOrg] = await banco.listar("membros", { org_id: org.id, papel: "dono" });
+          if (!donoOrg || !(await acesso.orgComAcesso(org.id))) continue;
+          const ctx = { usuario: { id: donoOrg.usuario_id, email: "" }, membro: donoOrg, org, papel: "dono", membros: [donoOrg] };
+          const r = await api.op.preencherGrade(ctx, { limite: 20 });
+          piloto += r.programados.length;
+        }
+      } catch (e) { log("piloto automático", e); }
+    }
     let renovados = 0;
     try { renovados = await renovarTokens(); } catch (e) { log("renovar tokens", e); }
     try { await banco.inserir("batimentos", { dono, inicio, fim: agora(), jobs: jobs.length, resultado: resultados }); } catch { /* opcional */ }
-    return { inicio, fim: agora(), reivindicados: jobs.length, resultados, tokens_renovados: renovados };
+    return { inicio, fim: agora(), reivindicados: jobs.length, resultados, tokens_renovados: renovados, piloto_programados: piloto };
   }
 
   return { rodar, processar };

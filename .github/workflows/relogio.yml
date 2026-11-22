@@ -17,12 +17,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     env:
-      REF: ${{ secrets.JS_SUPABASE_PROJECT_REF }}
-      SENHA: ${{ secrets.JS_SUPABASE_DB_PASSWORD }}
+      TOKEN: ${{ secrets.JS_SUPABASE_ACCESS_TOKEN }}
+      REF_FIXO: ${{ secrets.JS_SUPABASE_PROJECT_REF }}
     steps:
       - name: Chamar o worker
         run: |
-          if [ -z "$REF" ] || [ -z "$SENHA" ]; then echo "Servidor ainda não configurado."; exit 0; fi
-          WORKER=$(printf 'jarvis-social-worker:%s' "$SENHA" | sha256sum | cut -c1-48)
+          if [ -z "$TOKEN" ]; then echo "Servidor ainda não configurado."; exit 0; fi
+          REF="$REF_FIXO"
+          [ -z "$REF" ] && REF=$(curl -fsS -H "Authorization: Bearer $TOKEN" https://api.supabase.com/v1/projects | jq -r '[.[] | select(.name=="jarvis-social")][0].id // empty')
+          [ -z "$REF" ] && { echo "Projeto ainda não existe."; exit 0; }
+          WORKER=$(printf 'jarvis-social-worker:%s:%s' "$REF" "$TOKEN" | sha256sum | cut -c1-48)
           echo "::add-mask::$WORKER"
           curl -fsS -m 90 -X POST "https://$REF.supabase.co/functions/v1/worker" -H "x-jarvis-worker: $WORKER" | head -c 600; echo

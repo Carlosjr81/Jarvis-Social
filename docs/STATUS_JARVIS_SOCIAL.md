@@ -10,7 +10,7 @@
 | Branch | `main` (código da fundação veio do commit `a8cace1` da branch `ccr-272ef392-6vuh6i` do Super-HQs) |
 | Actions | workflow *Jarvis Social* dispara sozinho a cada push (repositório público). Run 45030840705 (22/11/2026): verde, mas SQL e painel não tinham rodado no runner; corrigido para instalar PostgreSQL e Chromium e reprovar se faltarem |
 | Etapa | A concluída (fundação) + B em parte (agendamento e adaptador Meta testados com simulador) + base comercial da E (cadastro com aprovação, termos, prazos, cobrança por Pix, painel do dono), 22/11/2026 |
-| Testes | `node testes/rodar.mjs` → 104 passou / 0 falhou (22/11/2026, sessão na nuvem; Actions confere a cada push) |
+| Testes | `node testes/rodar.mjs` → 107 passou / 0 falhou (22/11/2026, sessão na nuvem; Actions confere a cada push) |
 | Painel publicado | Pages ligado pelo dono em 22/11/2026 (main, raiz): https://carlosjr81.github.io/Jarvis-Social/ — em DEMONSTRAÇÃO até o servidor existir. A sessão na nuvem não alcança github.io; abertura no celular a confirmar pelo dono |
 | Servidor (Supabase) | **Não criado.** Depende do passo 1 do dono em `docs/DEPLOY.md` |
 | Instagram real | **Não conectado / nenhuma publicação real feita.** Depende do app da Meta (passo 2 do `DEPLOY.md`) |
@@ -76,9 +76,19 @@
   ChatGPT/Claude reais: depende do servidor (passo 1). Passo a passo:
   `docs/INTEGRACAO-ASSISTENTES.md`.
 
+## Mínimo de ações (pedido do dono, 22/11/2026)
+- Implantação com **um segredo** (`JS_SUPABASE_ACCESS_TOKEN`): o workflow acha
+  ou cria o projeto, aplica migrations pela API (`jarvis_migracoes`), gera a
+  cifra (uma vez) e o segredo do worker (derivado de ref+token), publica
+  api/worker/mcp, pg_cron, auth e grava config.js/openapi.
+- Dono automático (1ª conta confirmada; `JS_EMAIL_DONO` opcional).
+- App da Meta pelo painel (Ajustes › Instagram; segredo cifrado no banco).
+- Piloto automático por espaço (worker preenche a grade com rascunhos).
+- Início: lista "Configuração: N de 6"; Integrações com botões de copiar.
+
 ## Bloqueios (só o dono resolve)
-1. Criar o projeto grátis no Supabase e 4 segredos no GitHub, incluindo `JS_EMAIL_DONO` (`docs/DEPLOY.md`, passo 1).
-2. Criar o app da Meta e 2 segredos (`docs/DEPLOY.md`, passo 2).
+1. Conta grátis no Supabase + **um** segredo no GitHub (`JS_SUPABASE_ACCESS_TOKEN`) — `docs/DEPLOY.md`, passo 1.
+2. App da Meta pelo painel (`docs/DEPLOY.md`, passo 3).
 3. ~~Ligar o GitHub Pages~~ feito em 22/11/2026.
 
 ## Próxima ação

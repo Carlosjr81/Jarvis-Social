@@ -5,6 +5,7 @@ import { BancoPostgrest } from "../_compartilhado/banco.js";
 import { ArmazenamentoSupabase } from "../_compartilhado/armazenamento.js";
 import { criarInstagram, CONFIG_IG } from "../_compartilhado/instagram.js";
 import { iguaisTempoConstante } from "../_compartilhado/cifra.js";
+import { criarApiDoServidor } from "../_compartilhado/servidor.js";
 
 const env = (k: string) => Deno.env.get(k) || "";
 const URL_SB = env("SUPABASE_URL");
@@ -21,6 +22,7 @@ Deno.serve(async (req) => {
     segredos: { chaveCifra: env("JS_CHAVE_CIFRA"), emailsDono: env("JS_EMAIL_DONO").split(",").map((s) => s.trim()).filter(Boolean) },
     dono: "worker-" + crypto.randomUUID(),
     registrar: (...a: unknown[]) => console.error(...a),
+    api: criarApiDoServidor(env), // piloto automático: preenche a grade com os rascunhos
   });
   const r = await worker.rodar();
   return new Response(JSON.stringify(r), { headers: { "Content-Type": "application/json" } });

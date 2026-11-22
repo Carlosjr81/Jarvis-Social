@@ -169,4 +169,48 @@ teste("agendar_reel no próximo horário livre e publicar agora acorda o servido
   igual((await e.banco.listar("midias", { tipo: "video", mime: "video/mp4", tamanho: MP4.length })).length, 1, "o mesmo vídeo não é guardado duas vezes");
 });
 
+teste("dono automático: a primeira conta com e-mail confirmado vira dona; a segunda não", async () => {
+  const e = ambiente({ emailsDono: [] });
+  const semConf = (await e.chamar({ id: "x", email: "x@x" }, "GET", "/v1/conta")).corpo;
+  igual(semConf.dono, false, "sem e-mail confirmado não reivindica");
+  const p = (await e.chamar({ id: "p", email: "Primeiro@x", email_confirmado: true }, "GET", "/v1/conta")).corpo;
+  igual([p.dono, p.situacao], [true, "liberado"]);
+  const s2 = (await e.chamar({ id: "s", email: "segundo@x", email_confirmado: true }, "GET", "/v1/conta")).corpo;
+  igual([s2.dono, s2.situacao], [false, "pendente"]);
+  igual((await e.banco.obter("config_plataforma", "acesso")).dono_email, "primeiro@x");
+});
+
+teste("app da Meta configurado pelo painel (só o dono, segredo cifrado); conectar passa a funcionar", async () => {
+  const e = ambiente(); await e.preparar(A, { conectar: false });
+  const DONO = { id: "dono", email: "dono@x", email_confirmado: true };
+  const { criarApi } = await import("../supabase/functions/_compartilhado/api.js");
+  const api = criarApi({ banco: e.banco, armazenamento: e.arm, instagram: (await import("../supabase/functions/_compartilhado/instagram.js")).criarInstagram({ fetch: async () => new Response("{}") }), agora: e.relogio,
+    segredos: { emailsDono: ["dono@x"], chaveCifra: btoa(String.fromCharCode(...new Uint8Array(32).fill(7))), redirectUri: "https://ref.supabase.co/functions/v1/api/v1/instagram/retorno", urlPainel: "https://p/" } });
+  const ch = async (u, m, c, corpo) => (await api.tratar({ metodo: m, caminho: c, corpo: corpo || {}, usuario: u })).corpo;
+  igual((await ch(A, "POST", "/v1/instagram/conectar")).erro, "instagram_nao_configurado");
+  igual((await ch(A, "PUT", "/v1/admin/meta", { app_id: "123456789", app_secret: "a".repeat(32) })).erro, "so_dono");
+  igual((await ch(DONO, "PUT", "/v1/admin/meta", { app_id: "abc", app_secret: "x" })).erro, "app_id");
+  const secreto = "0123456789abcdef0123456789abcdef";
+  igual((await ch(DONO, "PUT", "/v1/admin/meta", { app_id: "1234567890123456", app_secret: secreto })).configurado, true);
+  const cfg = await e.banco.obter("config_plataforma", "acesso");
+  verdade(cfg.meta_app_secret_cifrado.startsWith("v1.") && !cfg.meta_app_secret_cifrado.includes(secreto), "segredo cifrado");
+  igual((await ch(DONO, "GET", "/v1/admin/meta")).app_id, "1234567890123456");
+  const url = (await ch(A, "POST", "/v1/instagram/conectar")).url;
+  verdade(url.includes("client_id=1234567890123456") && url.includes("instagram_business_content_publish"), url);
+  verdade(!JSON.stringify(await ch(A, "GET", "/v1/eu")).includes(secreto));
+});
+
+teste("piloto automático: rascunhos entram sozinhos nos horários livres; desligado não mexe", async () => {
+  const e = ambiente(); const { org, video } = await e.preparar(A);
+  for (let i = 0; i < 2; i++) await e.chamar(A, "POST", "/v1/posts", { video_id: video.id, legenda: "p" + i, chave_idempotencia: chave() });
+  const { criarWorker } = await import("../supabase/functions/_compartilhado/worker.js");
+  const w = () => criarWorker({ banco: e.banco, armazenamento: e.arm, instagram: e.ig, agora: e.relogio, api: e.api, dono: "w" + Math.random() });
+  await w().rodar();
+  igual((await e.banco.listar("posts", { estado: "draft" })).length, 2, "desligado: nada muda");
+  await e.chamar(A, "PUT", "/v1/organizacao", { piloto_automatico: true });
+  const r = await w().rodar();
+  igual(r.piloto_programados, 2);
+  igual((await e.banco.listar("posts", { estado: "scheduled" })).map((p) => p.agendado_utc).sort(), ["2026-11-23T13:00:00.000Z", "2026-11-24T13:00:00.000Z"]);
+});
+
 rodar("integração: chaves, grade de publicação e conector MCP (ChatGPT e Claude)");

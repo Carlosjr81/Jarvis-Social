@@ -15,7 +15,7 @@ assistente programa o que já está lá.
 
 **Estado (22/11/2026): pronto no código e testado com o banco simulado (101
 testes). Não instalado nem testado no ChatGPT/Claude reais**: depende do
-servidor no ar (`docs/DEPLOY.md`, passo 1).
+servidor no ar (`docs/DEPLOY.md`: um segredo só).
 
 ## 1. Criar a chave (no painel, uma vez por assistente)
 Ajustes › **Integrações: ChatGPT e Claude** › nome, escopo ("Ler e

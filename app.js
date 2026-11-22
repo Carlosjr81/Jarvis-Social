@@ -14,7 +14,7 @@ import { formatarLocal, partesLocais, somarDias, NOMES_DIA_LONGO, FUSO_PADRAO } 
 import { AJUDA } from "./supabase/functions/_compartilhado/comandos.js";
 import { sugerirEmail, PRAZOS_ACESSO, NOMES_SITUACAO } from "./supabase/functions/_compartilhado/acesso.js";
 
-export const VERSAO_PAINEL = "2026-11-22h";
+export const VERSAO_PAINEL = "2026-11-22i";
 const CH = { sessao: "jarvis-social:sessao", demo: "jarvis-social:demo", modo: "jarvis-social:modo", rascunho: "jarvis-social:rascunho", email: "jarvis-social:email" };
 const ls = {
   ler(k, padrao = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch { return padrao; } },
@@ -388,6 +388,7 @@ telas.inicio = async (el) => {
     ${ad && ad.aguardando ? `<a class="faixa" href="#usuarios" style="display:block">${ad.aguardando} cadastro(s) esperando a sua liberação ▶</a>` : ""}
     ${ad && ad.pagamentos ? `<a class="faixa" href="#usuarios" style="display:block">${ad.pagamentos} pagamento(s) para confirmar ▶</a>` : ""}
     ${contaEstado && contaEstado.plano.tipo === "teste" ? `<a class="faixa" href="#planos" style="display:block">Período de teste ${esc(contaEstado.plano.texto.replace("Em teste", "").trim())}. Ver planos ▶</a>` : ""}
+    ${await cartaoConfiguracao()}
     ${eu.alertas.map((a) => `<div class="faixa ${a.tipo === "pausa" ? "" : "erro"}">${esc(a.texto)} ${a.post_id ? `<a href="#post/${esc(a.post_id)}">ver</a>` : a.acao === "ajustes" ? `<a href="#ajustes">resolver</a>` : a.acao === "retomar" ? `<button data-fila="retomar">Retomar</button>` : ""}</div>`).join("")}
     <a class="botao primario grande" href="#criar" style="display:flex;align-items:center;justify-content:center;text-decoration:none">＋ Novo Reel</a>
     <div class="linha" style="margin-top:8px"><button id="lancar-propaganda">📣 Lançar propaganda</button><button id="teste-imediato">🧪 Teste imediato</button></div>
@@ -621,7 +622,16 @@ telas.ajustes = async (el) => {
       ${eu.conexoes.filter((c) => c.estado !== "revogada").map((c) => `<div class="item" style="align-items:center;margin:8px 0"><div class="texto"><strong>@${esc(c.usuario_rede)}</strong>${c.id === contaPadraoId() ? ` <span class="selo published">padrão</span>` : ""}<br><small>${esc({ ativa: "conectada", reconectar: "precisa reconectar" }[c.estado])}${c.simulado ? " · simulada" : ""}</small></div>
         ${c.id !== contaPadraoId() ? `<button data-padrao="${esc(c.id)}">Tornar padrão</button>` : ""}<button data-desconectar="${esc(c.id)}">Desconectar</button></div>`).join("")}
       <p class="fraco">A conta padrão vem marcada em cada Novo Reel; dá para trocar na hora de programar e na edição.</p>
-      ${eu.instagram_configurado ? `<button class="primario" id="conectar">${ativa ? "Conectar outra conta / reconectar" : "Conectar Instagram"}</button>` : `<div class="faixa">O app da Meta ainda não foi configurado no servidor. Passo a passo: docs/DEPLOY.md.</div>`}
+      ${eu.instagram_configurado ? `<button class="primario" id="conectar">${ativa ? "Conectar outra conta / reconectar" : "Conectar Instagram"}</button>` : contaEstado.dono ? "" : `<div class="faixa">O administrador ainda não configurou o app da Meta.</div>`}
+      ${contaEstado.dono && cli.modo === "servidor" ? `<details ${eu.instagram_configurado ? "" : "open"}><summary><strong>${eu.instagram_configurado ? "App da Meta configurado ✓ (trocar)" : "Configurar o app da Meta (uma vez)"}</strong></summary>
+        <ol class="fraco" style="padding-left:20px">
+          <li>Abra <a href="https://developers.facebook.com/apps/creation/" target="_blank" rel="noopener">developers.facebook.com › Criar app</a> e escolha o caso de uso do Instagram (gerenciar conteúdo).</li>
+          <li>Em Instagram › Configuração da API com login do Instagram, adicione a sua conta e cole este endereço de redirecionamento:</li></ol>
+        <textarea readonly style="min-height:70px">${esc(eu.redirect_uri_meta || "")}</textarea><button data-copiar="${esc(eu.redirect_uri_meta || "")}">Copiar endereço</button>
+        <ol start="3" class="fraco" style="padding-left:20px"><li>Copie o ID do app do Instagram e a chave secreta e cole aqui:</li></ol>
+        <label for="meta-id">ID do app do Instagram</label><input id="meta-id" inputmode="numeric" autocomplete="off">
+        <label for="meta-sec">Chave secreta do app</label><input id="meta-sec" type="password" autocomplete="off">
+        <div id="meta-msg"></div><button class="primario" id="meta-salvar" style="width:100%;margin-top:8px">Salvar e conectar o Instagram</button></details>` : ""}
       <p class="fraco">Conta profissional (criador ou empresa). A autorização é feita no próprio Instagram; o Jarvis nunca vê sua senha.</p></div>
     <div class="cartao"><h2>Integrações: ChatGPT e Claude</h2>
       <p class="fraco">Crie uma chave para o ChatGPT ou o Claude verem e preencherem a sua grade de Reels conversando com você. A chave vale só para este espaço; revogue quando quiser.</p>
@@ -637,6 +647,7 @@ telas.ajustes = async (el) => {
       <label>Horários</label><div class="chips" id="horarios">${pol.horarios.map((h) => `<button class="chip ativo" data-tirar="${h}" aria-label="Remover ${h}">${h} ✕</button>`).join("")}</div>
       <div class="linha"><input id="nova-hora" type="time" style="flex:1"><button id="add-hora">Adicionar</button></div>
       <label>Dias</label><div class="chips">${[1, 2, 3, 4, 5, 6, 7].map((d) => `<label class="chip" style="display:flex;gap:6px;align-items:center;margin:0"><input type="checkbox" data-dia="${d}" ${pol.dias.includes(d) ? "checked" : ""}>${NOMES_DIA_LONGO[d].slice(0, 3)}</label>`).join("")}</div>
+      <label style="display:flex;gap:10px"><input type="checkbox" id="piloto" ${eu.org.piloto_automatico ? "checked" : ""}>Piloto automático: rascunhos (seus ou do ChatGPT/Claude) entram sozinhos nos próximos horários livres</label>
       <label for="pausa">Pausar a frequência até (opcional)</label><input id="pausa" type="date" value="${esc(pol.pausadaAte || "")}">
       <div id="prev"></div>
       <button class="primario" id="ver-previa" style="width:100%;margin-top:8px">Ver prévia e aplicar</button></div>
@@ -657,6 +668,7 @@ telas.ajustes = async (el) => {
       <p class="fraco">Painel ${VERSAO_PAINEL} · API ${esc(eu.versao_api)}</p></div>`;
   $("#atraso").value = eu.org.politica_atraso;
   desenharChaves();
+  $("#piloto").onchange = async (e) => { try { await cli.chamar("PUT", "/v1/organizacao", { piloto_automatico: e.target.checked }); eu = await cli.chamar("GET", "/v1/eu"); } catch (err) { alert(err.message); e.target.checked = !e.target.checked; } };
   $("#criar-chave").onclick = async () => {
     try {
       const r = await cli.chamar("POST", "/v1/chaves", { nome: $("#chave-nome").value || "Assistente", escopo: $("#chave-escopo").value, dias: +$("#chave-dias").value });
@@ -664,8 +676,12 @@ telas.ajustes = async (el) => {
       $("#chave-nova").innerHTML = `<div class="faixa ok"><strong>Copie agora: a chave não aparece de novo.</strong>
         <label>Chave (ChatGPT: Ações › Autenticação › Chave de API › Bearer)</label><textarea readonly style="min-height:70px">${esc(r.segredo)}</textarea>
         <label>Endereço do conector (Claude: Conectores › Adicionar conector personalizado)</label><textarea readonly style="min-height:90px">${esc(base + "/functions/v1/mcp/" + r.segredo)}</textarea>
+        <div class="linha"><button data-copiar="${esc(base + "/functions/v1/mcp/" + r.segredo)}">Copiar p/ Claude</button><a class="botao" href="https://claude.ai/settings/connectors" target="_blank" rel="noopener">Abrir Conectores do Claude</a></div>
+        <div class="linha" style="margin-top:6px"><button data-copiar="${esc(r.segredo)}">Copiar chave p/ GPT</button><button data-copiar="${esc(INSTRUCOES_GPT)}">Copiar instruções do GPT</button>
+          <button data-copiar="${esc(new URL("openapi-chatgpt.json", location.href.split("#")[0]).toString())}">Copiar link do contrato (Ações)</button><a class="botao" href="https://chatgpt.com/gpts/editor" target="_blank" rel="noopener">Criar GPT</a></div>
         ${cli.modo === "demonstracao" ? "<p>Demonstração: a chave só existe neste aparelho; o conector funciona depois que o servidor estiver no ar.</p>" : ""}</div>`;
       desenharChaves();
+  $("#piloto").onchange = async (e) => { try { await cli.chamar("PUT", "/v1/organizacao", { piloto_automatico: e.target.checked }); eu = await cli.chamar("GET", "/v1/eu"); } catch (err) { alert(err.message); e.target.checked = !e.target.checked; } };
     } catch (err) { alert(err.message); }
   };
   const horarios = new Set(pol.horarios);
@@ -681,6 +697,12 @@ telas.ajustes = async (el) => {
     } catch (err) { $("#prev").innerHTML = `<div class="faixa erro">${mensagemErro(err)}</div>`; }
   };
   $("#salvar-org").onclick = async () => { try { await cli.chamar("PUT", "/v1/organizacao", { politica_atraso: $("#atraso").value, tolerancia_atraso_min: +$("#tol").value, fuso: $("#fuso").value }); eu = await cli.chamar("GET", "/v1/eu"); alert("Salvo."); } catch (err) { alert(err.message); } };
+  $("#meta-salvar") && ($("#meta-salvar").onclick = async () => {
+    try {
+      await cli.chamar("PUT", "/v1/admin/meta", { app_id: $("#meta-id").value, app_secret: $("#meta-sec").value });
+      const r = await cli.chamar("POST", "/v1/instagram/conectar"); if (r.url) location.href = r.url;
+    } catch (err) { $("#meta-msg").innerHTML = `<div class="faixa erro">${mensagemErro(err)}</div>`; }
+  });
   el.querySelectorAll("[data-padrao]").forEach((b) => (b.onclick = async () => { await cli.chamar("PUT", "/v1/organizacao", { conta_padrao_id: b.dataset.padrao }); eu = await cli.chamar("GET", "/v1/eu"); mostrar(); }));
   $("#conectar") && ($("#conectar").onclick = async () => { try {
     let corpo = {};
@@ -819,6 +841,36 @@ function abrirPropaganda() {
 }
 
 // ------------------------------------------------------------------ chaves de integração e grade
+const INSTRUCOES_GPT = `Você gerencia a grade de Reels do Instagram do dono pelo Jarvis Social.
+Comece por verGrade. Datas no fuso America/Sao_Paulo (AAAA-MM-DD e HH:MM).
+Para Reel novo use agendarReel com o link do vídeo (Drive "qualquer pessoa com o link", Dropbox ou MP4 direto). Arquivo anexado não é link: peça o link do Drive.
+Antes de mudar a frequência, mostre previaFrequencia e só aplique com o OK do dono. Antes de cancelar ou publicar agora, confirme.
+"Agendado no Jarvis" não é "publicado"; publicado só com permalink. Responda em português, curto, com horários e estado de cada post.`;
+// Botões "Copiar ..." em qualquer tela.
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-copiar]"); if (!b) return;
+  try { await navigator.clipboard.writeText(b.dataset.copiar); const t = b.textContent; b.textContent = "Copiado ✓"; setTimeout(() => (b.textContent = t), 1500); }
+  catch { prompt("Copie:", b.dataset.copiar); }
+});
+
+// Lista de configuração (dono/admin): o que falta para tudo funcionar sozinho.
+async function cartaoConfiguracao() {
+  if (!contaEstado || !["dono", "admin"].includes(eu.papel)) return "";
+  let chaves = [];
+  try { chaves = (await cli.chamar("GET", "/v1/chaves")).chaves.filter((k) => !k.revogado); } catch {}
+  const itens = [
+    [cli.modo === "servidor", "Servidor no ar", "Siga o passo 1 de docs/DEPLOY.md (um token do Supabase no GitHub).", null],
+    [!!eu.instagram_configurado, "App da Meta configurado", "Ajustes › Instagram › Configurar o app da Meta", "#ajustes"],
+    [eu.conexoes.some((c) => c.estado === "ativa"), "Instagram conectado", "Ajustes › Instagram › Conectar", "#ajustes"],
+    [!!eu.org.piloto_automatico, "Piloto automático ligado", "Ajustes › Frequência › Piloto automático", "#ajustes"],
+    [chaves.length > 0, "ChatGPT/Claude conectado", "Ajustes › Integrações › Criar chave", "#ajustes"],
+    [chaves.some((k) => k.ultimo_uso), "Assistente já usou a chave", "Peça ao assistente: 'mostre a grade de Reels'", null],
+  ];
+  const feitos = itens.filter((x) => x[0]).length;
+  if (feitos === itens.length) return "";
+  return `<details class="cartao" ${feitos < 3 ? "open" : ""}><summary><strong>Configuração: ${feitos} de ${itens.length}</strong></summary>
+    ${itens.map(([ok, nome, como, link]) => `<p>${ok ? "✅" : "⬜"} <strong>${esc(nome)}</strong>${ok ? "" : `<br><small class="fraco">${link ? `<a href="${link}">${esc(como)}</a>` : esc(como)}</small>`}</p>`).join("")}</details>`;
+}
 async function desenharChaves() {
   const alvo = $("#chaves"); if (!alvo) return;
   try {
